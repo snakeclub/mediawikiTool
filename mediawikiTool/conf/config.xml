@@ -1,0 +1,397 @@
+<?xml version="1.0" encoding="utf-8"?>
+<console>
+    <!--
+        控制台配置
+        name : 控制台名称
+        version : 版本，前面无需带V
+        language : 当前语言, 默认是en，可以选择zh_cn
+        i18n : 多语言翻译文件的存放目录（如果是相对目录，会以启动时的工作目录为准）;
+            注：如果不传值，会默认以当前安装包的目录找i18n目录
+        shell_encoding : 控制台命令行编码，一般来说windows为GBK，linux为utf-8
+        message : 命令行的开头提示信息
+        start_tips : 启动时提示的信息(json)
+        default_dealfun : 默认处理函数配置（匹配不到命令的时候执行）
+        on_abort : Ctrl + C 取消本次输入执行函数
+        on_exit : Ctrl + D 关闭命令行执行函数
+        cmd_list : 嵌入的命令参数，每一个cmd标签就是一个命令配置
+            command : cmd命令
+            module_name : 模块名，注意应包含包路径
+            class_name : 处理类名
+            extend_path : 如果模块不在标准python搜索路径中，应传入搜索该模块的路径
+            init_para : 处理类初始化传入的JSON参数(字典形式)
+            cmd_para : 命令控制参数字典，如果只有命令无参数该字段可空，具体参数含义见HiveNetLib的prompt_plus手册
+            help : 命令帮助信息，是一个json格式的字典，key为帮助信息对应的语言，value为显示的多行数组
+                注：如果在字典里找不到对应的语言，则默认取第一个显示
+    -->
+    <name>mediawikiTool</name>
+    <version>0.5.0</version>
+    <language>en</language>
+    <i18n></i18n>
+    <shell_encoding>GBK</shell_encoding>
+    <message>wikitool/>&#160;</message>
+    <start_tips>{
+        "en": [
+            "",
+            "mediawikiTool Console V{{VERSION}}",
+            "Power by Li Huijian @ 2019",
+            "please type \"help\" to get help info",
+            "you can use Ctrl+C cancle when inputing, or use Ctrl+D exit the Console",
+            ""
+        ],
+        "zh_cn": [
+                "",
+                "mediawikiTool Console (控制台)  V{{VERSION}}",
+                "Power by 黎慧剑 @ 2019",
+                "查看命令帮助请执行 help 命令",
+                "输入过程中可通过Ctrl+C取消输入，通过Ctrl+D退出命令行处理服务",
+                ""
+        ]
+    }
+    </start_tips>
+    <default_dealfun>
+        <module_name>mediawikiTool.lib.base_cmd</module_name>
+        <class_name>CmdDefault</class_name>
+        <extend_path></extend_path>
+        <init_para></init_para>
+    </default_dealfun>
+    <on_abort>
+        <module_name>mediawikiTool.lib.base_cmd</module_name>
+        <class_name>CmdOnAbort</class_name>
+        <extend_path></extend_path>
+        <init_para></init_para>
+    </on_abort>
+    <on_exit>
+        <module_name>mediawikiTool.lib.base_cmd</module_name>
+        <class_name>CmdOnExit</class_name>
+        <extend_path></extend_path>
+        <init_para></init_para>
+    </on_exit>
+    <cmd_list type="list">
+        <cmd>
+            <command>help</command>
+            <module_name>mediawikiTool.lib.base_cmd</module_name>
+            <class_name>CommonCmd</class_name>
+            <extend_path></extend_path>
+            <init_para></init_para>
+            <cmd_para>{
+                "name_para": {},
+                "short_para": {},
+                "long_para": {}
+            }
+            </cmd_para>
+            <help>{
+                "en": [
+                    "Support mediawikiTool console commands help info",
+                    "",
+                    "help [command]",
+                    "    command : show the [command string] command's help info",
+                    "",
+                    "demo: help help",
+                    ""
+                ],
+                "zh_cn": [
+                    "提供 mediawikiTool 控制台命令的帮助信息",
+                    "",
+                    "help [command]",
+                    "    command : 显示指定 command 命令的帮助信息",
+                    "",
+                    "示例: help help",
+                    ""
+                ]
+            }
+            </help>
+        </cmd>
+        <cmd>
+            <command>exit</command>
+            <module_name>mediawikiTool.lib.base_cmd</module_name>
+            <class_name>CmdOnExit</class_name>
+            <extend_path></extend_path>
+            <init_para></init_para>
+            <cmd_para>{
+                "name_para": {},
+                "short_para": {},
+                "long_para": {}
+            }
+            </cmd_para>
+            <help>{
+                "en": [
+                    "Exit mediawikiTool console",
+                    "",
+                    "demo: exit",
+                    ""
+                ],
+                "zh_cn": [
+                    "退出 mediawikiTool 控制台",
+                    "",
+                    "示例: exit",
+                    ""
+                ]
+            }
+            </help>
+        </cmd>
+        <cmd>
+            <command>pwd</command>
+            <module_name>mediawikiTool.lib.base_cmd</module_name>
+            <class_name>CommonCmd</class_name>
+            <extend_path></extend_path>
+            <init_para></init_para>
+            <cmd_para>{
+                "name_para": {},
+                "short_para": {},
+                "long_para": {}
+            }
+            </cmd_para>
+            <help>{
+                "en": [
+                    "Show current work path",
+                    "",
+                    "demo: pwd",
+                    ""
+                ],
+                "zh_cn": [
+                    "显示当前工作目录",
+                    "",
+                    "示例: pwd",
+                    ""
+                ]
+            }
+            </help>
+        </cmd>
+        <cmd>
+            <command>setlanguage</command>
+            <module_name>mediawikiTool.lib.base_cmd</module_name>
+            <class_name>CommonCmd</class_name>
+            <extend_path></extend_path>
+            <init_para></init_para>
+            <cmd_para>{
+                "name_para": {},
+                "short_para": {},
+                "long_para": {},
+                "word_para": {
+                    "en": "",
+                    "zh_cn": ""
+                }
+            }
+            </cmd_para>
+            <help>{
+                "en": [
+                    "Change language",
+                    "",
+                    "setlanguage lang",
+                    "    lang : tag of language, like 'en' or 'zh_ch'",
+                    "",
+                    "demo: setlanguage en",
+                    ""
+                ]
+            }
+            </help>
+        </cmd>
+        <cmd>
+            <command>cd</command>
+            <module_name>mediawikiTool.lib.base_cmd</module_name>
+            <class_name>CommonCmd</class_name>
+            <extend_path></extend_path>
+            <init_para></init_para>
+            <cmd_para>{
+                "name_para": {},
+                "short_para": {},
+                "long_para": {}
+            }
+            </cmd_para>
+            <help>{
+                "en": [
+                    "Change current work path",
+                    "",
+                    "cd path",
+                    "    path : new work path",
+                    "",
+                    "demo: cd d:\\test\\",
+                    ""
+                ],
+                "zh_cn": [
+                    "修改当前工作目录",
+                    "",
+                    "cd path",
+                    "    path : 要修改的工作目录",
+                    "",
+                    "示例: cd d:\\test\\",
+                    ""
+                ]
+            }
+            </help>
+        </cmd>
+        <cmd>
+            <command>syscmd</command>
+            <module_name>mediawikiTool.lib.base_cmd</module_name>
+            <class_name>CommonCmd</class_name>
+            <extend_path></extend_path>
+            <init_para></init_para>
+            <cmd_para>{
+                "name_para": {},
+                "short_para": {},
+                "long_para": {
+                    "ni": [],
+                    "bg": [],
+                    "ns": []
+                }
+            }
+            </cmd_para>
+            <help>{
+                "en": [
+                        "Execute system command",
+                        "",
+                        "syscmd [-ni] [-bg] [-ns] [command]",
+                        "    command : execute system command, can be followed by specific execution parameters",
+                        "    -ni : No interruption allowed, Ctrl + C encountered when specifying this parameter is masked and waits for the command to complete",
+                        "    -bg : Background execution parameters, this parameter represents the command executing in the background, an interrupt does not end the command execution process",
+                        "    -ns : Execution results are not displayed, specifies that this parameter does not output the information that the command executes",
+                        "",
+                        "demo: syscmd dir /w",
+                        ""
+                ],
+                "zh_cn": [
+                        "执行操作系统自有命令",
+                        "",
+                        "syscmd [-ni] [-bg] [-ns] [command]",
+                        "    command : 执行操作系统命令，命令后面可以带具体执行参数",
+                        "    -ni : 不允许中断，指定该参数时遇到 Ctrl + C 会被屏蔽并等待命令执行完成",
+                        "    -bg : 后台执行参数，执行该参数代表命令在后台执行，中断时不会结束命令执行进程",
+                        "    -ns : 不显示执行结果，指定该参数不输出命令执行所输出的信息",
+                        "",
+                        "示例: syscmd dir /w",
+                        ""
+                ]
+            }
+            </help>
+        </cmd>
+        <cmd>
+            <command>mdtowiki</command>
+            <module_name>mediawikiTool.lib.mediawiki_cmd</module_name>
+            <class_name>MediaWikiCmd</class_name>
+            <extend_path></extend_path>
+            <init_para></init_para>
+            <cmd_para>{
+                "name_para": {},
+                "short_para": {},
+                "long_para": {
+                    "in": [],
+                    "out": [],
+                    "name": [],
+                    "stdpic": []
+                }
+            }
+            </cmd_para>
+            <help>{
+                "en": [
+                        "convert markdown file to mediawiki format",
+                        "",
+                        "mdtowiki -in file [-out outpath] [-name title] [-stdpic]",
+                        "    -in : Markdown file path (include filename), if just filename then search on the current working directory",
+                        "    -out : the MediaWiki file output path, If not specified to represent output on the current working directory",
+                        "    -name : MediaWiki page title, If you do not specify the filename that represents the use of Markdown filename (without the extension)",
+                        "    -stdpic : Set this parameter to automatically rename the pictures in order;Otherwise it will be named after the original file name",
+                        "",
+                        "demo: mdtowiki -in mdtowiki.md",
+                        ""
+                ],
+                "zh_cn": [
+                        "将markdown格式文件转换为mediawiki格式",
+                        "",
+                        "mdtowiki -in file [-out outpath] [-name title] [-stdpic]",
+                        "    -in : Markdown文件路径(含名称), 如果在当前工作目录下可以只输入名称",
+                        "    -out : 要输出的MediaWiki文件路径, 如果不指定代表输出在当前工作目录上",
+                        "    -name : MediaWiki标题名字，如果不指定代表使用Markdown的文件名(不含扩展名)",
+                        "    -stdpic : 设置该参数可以自动将图片按顺序重命名; 否则将按原文件名命名",
+                        "",
+                        "示例: mdtowiki -in mdtowiki.md",
+                        ""
+                ]
+            }
+            </help>
+        </cmd>
+        <cmd>
+            <command>docxtowiki</command>
+            <module_name>mediawikiTool.lib.mediawiki_cmd</module_name>
+            <class_name>MediaWikiCmd</class_name>
+            <extend_path></extend_path>
+            <init_para></init_para>
+            <cmd_para>{
+                "name_para": {},
+                "short_para": {},
+                "long_para": {
+                    "in": [],
+                    "out": [],
+                    "name": []
+                }
+            }
+            </cmd_para>
+            <help>{
+                "en": [
+                        "convert docx file to mediawiki format",
+                        "",
+                        "docxtowiki -in file [-out outpath] [-name title] [-stdpic]",
+                        "    -in : docx file path (include filename), if just filename then search on the current working directory",
+                        "    -out : the MediaWiki file output path, If not specified to represent output on the current working directory",
+                        "    -name : MediaWiki page title, If you do not specify the filename that represents the use of docx filename (without the extension)",
+                        "",
+                        "demo: docxtowiki -in docxtowiki.docx",
+                        ""
+                ],
+                "zh_cn": [
+                        "将docx格式文件转换为mediawiki格式",
+                        "",
+                        "docxtowiki -in file [-out outpath] [-name title]",
+                        "    -in : docx文件路径(含名称), 如果在当前工作目录下可以只输入名称",
+                        "    -out : 要输出的MediaWiki文件路径, 如果不指定代表输出在当前工作目录上",
+                        "    -name : MediaWiki标题名字，如果不指定代表使用Markdown的文件名(不含扩展名)",
+                        "",
+                        "示例: docxtowiki -in docxtowiki.docx",
+                        ""
+                ]
+            }
+            </help>
+        </cmd>
+        <cmd>
+            <command>filestowiki</command>
+            <module_name>mediawikiTool.lib.mediawiki_cmd</module_name>
+            <class_name>MediaWikiCmd</class_name>
+            <extend_path></extend_path>
+            <init_para></init_para>
+            <cmd_para>{
+                "name_para": {},
+                "short_para": {},
+                "long_para": {
+                    "in": [],
+                    "out": [],
+                    "stdpic": []
+                }
+            }
+            </cmd_para>
+            <help>{
+                "en": [
+                        "convert files in the path to mediawiki format",
+                        "",
+                        "filestowiki [-in inputpath] [-out outpath] [-name title] [-stdpic]",
+                        "    -in : input path, If not specified to represent on the current working directory",
+                        "    -out : the MediaWiki file output path, If not specified to represent output on the current working directory",
+                        "    -stdpic : Set this parameter to automatically rename the pictures in order;Otherwise it will be named after the original file name",
+                        "",
+                        "demo: filestowiki",
+                        ""
+                ],
+                "zh_cn": [
+                        "将指定路径下的文件批量转换为mediawiki格式",
+                        "",
+                        "filestowiki [-in inputpath] [-out outpath] [-name title] [-stdpic]",
+                        "    -in : 输入文件路径, 如果部指定代表在当前工作目录",
+                        "    -out : 要输出的MediaWiki文件路径, 如果不指定代表输出在当前工作目录上",
+                        "    -stdpic : 设置该参数可以自动将图片按顺序重命名; 否则将按原文件名命名",
+                        "",
+                        "示例: filestowiki",
+                        ""
+                ]
+            }
+            </help>
+        </cmd>
+    </cmd_list>
+</console>

@@ -1,0 +1,26 @@
+{
+  "name": "mediawikiTool",
+  "version": "0.5.0",
+  "description": "A command line tool for mediawiki file format covert and so on.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "release": "standard-version"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/snakeclub/mediawikiTool.git"
+  },
+  "keywords": [],
+  "author": "黎慧剑",
+  "license": "MPL",
+  "bugs": {
+    "url": "https://github.com/snakeclub/mediawikiTool/issues"
+  },
+  "homepage": "https://github.com/snakeclub/mediawikiTool#readme",
+  "config": {
+    "commitizen": {
+      "path": "cz-conventional-changelog"
+    }
+  }
+}
