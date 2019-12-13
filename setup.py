@@ -21,7 +21,7 @@ SHORT_DESCRIPTION = """
 A command line tool for mediawiki file format covert and so on.""".strip()
 
 DEPENDENCIES = [
-    'HiveNetLib' >= '0.7.1'
+    'HiveNetLib>=0.7.1',
 ]
 
 # DEPENDENCIES = []
