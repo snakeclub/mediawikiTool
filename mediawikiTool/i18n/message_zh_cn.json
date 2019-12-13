@@ -35,5 +35,6 @@
     "Current language set to '$1'": "当前语言设置为'$1'",
     "begin convert files in $1": "开始转换文件，路径: $1",
     "not support file format": "不支持的文件格式",
-    "convert files": "批量转换文件"
+    "convert files": "批量转换文件",
+    "language must be not null": "设置的语言不能为空"
 }

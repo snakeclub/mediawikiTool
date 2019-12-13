@@ -24,7 +24,7 @@
                 注：如果在字典里找不到对应的语言，则默认取第一个显示
     -->
     <name>mediawikiTool</name>
-    <version>0.5.0</version>
+    <version>0.5.1</version>
     <language>en</language>
     <i18n></i18n>
     <shell_encoding>GBK</shell_encoding>

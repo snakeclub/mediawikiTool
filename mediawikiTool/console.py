@@ -34,7 +34,8 @@ def main(**kwargs):
     # 获取命令行参数，需要外部传入config、encoding参数
     # 例如 console.py config=/conf/config.xml encoding=utf-8
     CONSOLE_GLOBAL_PARA = {
-        'execute_file_path': FileTool.get_exefile_path(),  # 执行文件所在目录
+        # 'execute_file_path': FileTool.get_exefile_path(),  # 执行文件所在目录，应指当前文件
+        'execute_file_path': os.path.realpath(FileTool.get_file_path(__file__)),
         'work_path': os.getcwd(),  # 工作目录，可以通过cd命令切换，通过pwd命令查看工作目录路径
     }
     RunTool.set_global_var('CONSOLE_GLOBAL_PARA', CONSOLE_GLOBAL_PARA)
@@ -43,6 +44,8 @@ def main(**kwargs):
         os.path.join(CONSOLE_GLOBAL_PARA['execute_file_path'], 'conf/config.xml')
     ) if 'config' not in _cmd_opts.keys() else _cmd_opts['config']
     _encoding = 'utf-8' if 'encoding' not in _cmd_opts.keys() else _cmd_opts['encoding']
+    CONSOLE_GLOBAL_PARA['config_encoding'] = _encoding
+    CONSOLE_GLOBAL_PARA['config_file'] = _config
 
     # 获取配置文件信息
     _config_xml = SimpleXml(os.path.realpath(_config), encoding=_encoding)

@@ -21,14 +21,14 @@ SHORT_DESCRIPTION = """
 A command line tool for mediawiki file format covert and so on.""".strip()
 
 DEPENDENCIES = [
-    'HiveNetLib>=0.7.1',
+    'HiveNetLib>=0.7.2',
 ]
 
 # DEPENDENCIES = []
 
 TEST_DEPENDENCIES = []
 
-VERSION = '0.5.0'
+VERSION = '0.5.1'
 URL = 'https://github.com/snakeclub/mediawikiTool'
 
 setup(
@@ -49,7 +49,7 @@ setup(
     packages=find_packages(),
     install_requires=DEPENDENCIES,
     tests_require=TEST_DEPENDENCIES,
-    package_data={'': ['*.json']},  # 这里将打包所有的json文件
+    package_data={'': ['*.json', '*.xml']},  # 这里将打包所有的json文件
     classifiers=[
         'Operating System :: OS Independent',
         'License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)',
