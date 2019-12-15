@@ -1,6 +1,6 @@
 {
   "name": "mediawikiTool",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "A command line tool for mediawiki file format covert and so on.",
   "main": "index.js",
   "scripts": {

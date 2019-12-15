@@ -1,14 +1,15 @@
-<?xml version="1.0" encoding="utf-8"?>
 <console>
     <!--
         控制台配置
         name : 控制台名称
+        shell_cmd_name : 可直接执行的命令名称（注册到操作系统的软连接）
         version : 版本，前面无需带V
         language : 当前语言, 默认是en，可以选择zh_cn
         i18n : 多语言翻译文件的存放目录（如果是相对目录，会以启动时的工作目录为准）;
             注：如果不传值，会默认以当前安装包的目录找i18n目录
         shell_encoding : 控制台命令行编码，一般来说windows为GBK，linux为utf-8
         message : 命令行的开头提示信息
+        shell_cmd_help : 命令行直接执行的帮助信息(json)
         start_tips : 启动时提示的信息(json)
         default_dealfun : 默认处理函数配置（匹配不到命令的时候执行）
         on_abort : Ctrl + C 取消本次输入执行函数
@@ -24,15 +25,57 @@
                 注：如果在字典里找不到对应的语言，则默认取第一个显示
     -->
     <name>mediawikiTool</name>
-    <version>0.5.1</version>
+    <shell_cmd_name>wikitool</shell_cmd_name>
+    <version>0.6.0</version>
     <language>en</language>
-    <i18n></i18n>
+    <i18n/>
     <shell_encoding>GBK</shell_encoding>
-    <message>wikitool/>&#160;</message>
+    <message>wikitool/&gt; </message>
+    <shell_cmd_help>{
+        "en": [
+            "",
+            "{{NAME}} Power by Li Huijian @ 2019",
+            "1. if you want to enter {{NAME}} Console, please execute '{{SHELL_CMD_NAME}}' in command line;",
+            "2. if you want to use self config file, please use 'config=you config file' para, and use 'encoding=utf-8' set the file encoding, like:",
+            "    # {{SHELL_CMD_NAME}} config=\"/myapp/config.xml\"",
+            "3. you can execute command use system shell directly, use 'shell_cmd=\"command string\"', like:",
+            "    # {{SHELL_CMD_NAME}} shell_cmd=\"cd d:/test/\"",
+            "    or use the follow method execute some command list in order",
+            "    # {{SHELL_CMD_NAME}} shell_cmd=\"[\\\"command 1\\\", \\\"command 2\\\", ...]\"",
+            "    Note:",
+            "    (1)if the command string has '\"', use '\\\"' transferred;",
+            "    (2)if the command string has '\\', use '\\\\' transferred;",
+            "    (3)for many command list，the list must use '\"' to sign the string.",
+            "4. you can execute a command list file, use 'shell_cmdfile=\"cmdfile\"', one command in one line in the file, like:",
+            "    # {{SHELL_CMD_NAME}} shell_cmdfile=\"cmd.txt\"",
+            "    Note: you can use 'cmdfile_encoding=uft-8' set the enconding of cmdfile",
+            ""
+        ],
+        "zh_cn": [
+                "",
+                "{{NAME}} Power by 黎慧剑 @ 2019",
+                "1. 要进入 {{NAME}} 控制台请在命令行输入 '{{SHELL_CMD_NAME}}'",
+                "2. 如果需要指定自定义配置文件, 请使用'config=自定义配置文件'参数, 以及通过'encoding=utf-8'指定配置文件编码, 例如:",
+                "    # {{SHELL_CMD_NAME}} config=\"/myapp/config.xml\"",
+                "3. 可以直接通过命令行直接执行所需要的命令, 使用'shell_cmd=\"需执行的命令\"', 例如:",
+                "    # {{SHELL_CMD_NAME}} shell_cmd=\"cd d:/test/\"",
+                "    或用以下数组方式顺序执行多个命令",
+                "    # {{SHELL_CMD_NAME}} shell_cmd=\"[\\\"命令1\\\", \\\"命令2\\\", ...]\"",
+                "    注意:",
+                "    (1)如果命令中有'\"'符号, 可以通过'\\\"'进行转义;",
+                "    (2)如果命令中需要有'\\', 可以通过'\\\\'进行转义;",
+                "    (3)多个命令的情况，数组中的命令必须使用'\"'作为字符串的标识.",
+                "4. 可以执行一个包含多个命令的文件，使用'shell_cmdfile=\"命令文件\"', 文件中一行是一个命令, 例如:",
+                "    # {{SHELL_CMD_NAME}} shell_cmdfile=\"cmd.txt\"",
+                "    注意: 可以使用'cmdfile_encoding=uft-8'指定解析文件的编码",
+                ""
+        ]
+    }
+    </shell_cmd_help>
     <start_tips>{
         "en": [
             "",
-            "mediawikiTool Console V{{VERSION}}",
+            "{{NAME}} Console V{{VERSION}}",
             "Power by Li Huijian @ 2019",
             "please type \"help\" to get help info",
             "you can use Ctrl+C cancle when inputing, or use Ctrl+D exit the Console",
@@ -40,7 +83,7 @@
         ],
         "zh_cn": [
                 "",
-                "mediawikiTool Console (控制台)  V{{VERSION}}",
+                "{{NAME}} Console (控制台)  V{{VERSION}}",
                 "Power by 黎慧剑 @ 2019",
                 "查看命令帮助请执行 help 命令",
                 "输入过程中可通过Ctrl+C取消输入，通过Ctrl+D退出命令行处理服务",
@@ -49,39 +92,35 @@
     }
     </start_tips>
     <default_dealfun>
-        <module_name>mediawikiTool.lib.base_cmd</module_name>
+        <module_name>HiveNetLib.simple_console.base_cmd</module_name>
         <class_name>CmdDefault</class_name>
-        <extend_path></extend_path>
-        <init_para></init_para>
+        <extend_path/>
+        <init_para/>
     </default_dealfun>
     <on_abort>
-        <module_name>mediawikiTool.lib.base_cmd</module_name>
+        <module_name>HiveNetLib.simple_console.base_cmd</module_name>
         <class_name>CmdOnAbort</class_name>
-        <extend_path></extend_path>
-        <init_para></init_para>
+        <extend_path/>
+        <init_para/>
     </on_abort>
     <on_exit>
-        <module_name>mediawikiTool.lib.base_cmd</module_name>
+        <module_name>HiveNetLib.simple_console.base_cmd</module_name>
         <class_name>CmdOnExit</class_name>
-        <extend_path></extend_path>
-        <init_para></init_para>
+        <extend_path/>
+        <init_para/>
     </on_exit>
     <cmd_list type="list">
         <cmd>
             <command>help</command>
-            <module_name>mediawikiTool.lib.base_cmd</module_name>
+            <module_name>HiveNetLib.simple_console.base_cmd</module_name>
             <class_name>CommonCmd</class_name>
-            <extend_path></extend_path>
-            <init_para></init_para>
-            <cmd_para>{
-                "name_para": {},
-                "short_para": {},
-                "long_para": {}
-            }
+            <extend_path/>
+            <init_para/>
+            <cmd_para>{}
             </cmd_para>
             <help>{
                 "en": [
-                    "Support mediawikiTool console commands help info",
+                    "Support {{NAME}} console commands help info",
                     "",
                     "help [command]",
                     "    command : show the [command string] command's help info",
@@ -90,7 +129,7 @@
                     ""
                 ],
                 "zh_cn": [
-                    "提供 mediawikiTool 控制台命令的帮助信息",
+                    "提供 {{NAME}} 控制台命令的帮助信息",
                     "",
                     "help [command]",
                     "    command : 显示指定 command 命令的帮助信息",
@@ -103,25 +142,21 @@
         </cmd>
         <cmd>
             <command>exit</command>
-            <module_name>mediawikiTool.lib.base_cmd</module_name>
+            <module_name>HiveNetLib.simple_console.base_cmd</module_name>
             <class_name>CmdOnExit</class_name>
-            <extend_path></extend_path>
-            <init_para></init_para>
-            <cmd_para>{
-                "name_para": {},
-                "short_para": {},
-                "long_para": {}
-            }
+            <extend_path/>
+            <init_para/>
+            <cmd_para>{}
             </cmd_para>
             <help>{
                 "en": [
-                    "Exit mediawikiTool console",
+                    "Exit {{NAME}} console",
                     "",
                     "demo: exit",
                     ""
                 ],
                 "zh_cn": [
-                    "退出 mediawikiTool 控制台",
+                    "退出 {{NAME}} 控制台",
                     "",
                     "示例: exit",
                     ""
@@ -131,15 +166,11 @@
         </cmd>
         <cmd>
             <command>pwd</command>
-            <module_name>mediawikiTool.lib.base_cmd</module_name>
+            <module_name>HiveNetLib.simple_console.base_cmd</module_name>
             <class_name>CommonCmd</class_name>
-            <extend_path></extend_path>
-            <init_para></init_para>
-            <cmd_para>{
-                "name_para": {},
-                "short_para": {},
-                "long_para": {}
-            }
+            <extend_path/>
+            <init_para/>
+            <cmd_para>{}
             </cmd_para>
             <help>{
                 "en": [
@@ -159,14 +190,11 @@
         </cmd>
         <cmd>
             <command>setlanguage</command>
-            <module_name>mediawikiTool.lib.base_cmd</module_name>
+            <module_name>HiveNetLib.simple_console.base_cmd</module_name>
             <class_name>CommonCmd</class_name>
-            <extend_path></extend_path>
-            <init_para></init_para>
+            <extend_path/>
+            <init_para/>
             <cmd_para>{
-                "name_para": {},
-                "short_para": {},
-                "long_para": {},
                 "word_para": {
                     "en": "",
                     "zh_cn": ""
@@ -188,15 +216,11 @@
         </cmd>
         <cmd>
             <command>cd</command>
-            <module_name>mediawikiTool.lib.base_cmd</module_name>
+            <module_name>HiveNetLib.simple_console.base_cmd</module_name>
             <class_name>CommonCmd</class_name>
-            <extend_path></extend_path>
-            <init_para></init_para>
-            <cmd_para>{
-                "name_para": {},
-                "short_para": {},
-                "long_para": {}
-            }
+            <extend_path/>
+            <init_para/>
+            <cmd_para>{}
             </cmd_para>
             <help>{
                 "en": [
@@ -222,13 +246,11 @@
         </cmd>
         <cmd>
             <command>syscmd</command>
-            <module_name>mediawikiTool.lib.base_cmd</module_name>
+            <module_name>HiveNetLib.simple_console.base_cmd</module_name>
             <class_name>CommonCmd</class_name>
-            <extend_path></extend_path>
-            <init_para></init_para>
+            <extend_path/>
+            <init_para/>
             <cmd_para>{
-                "name_para": {},
-                "short_para": {},
                 "long_para": {
                     "ni": [],
                     "bg": [],
@@ -268,11 +290,9 @@
             <command>mdtowiki</command>
             <module_name>mediawikiTool.lib.mediawiki_cmd</module_name>
             <class_name>MediaWikiCmd</class_name>
-            <extend_path></extend_path>
-            <init_para></init_para>
+            <extend_path/>
+            <init_para/>
             <cmd_para>{
-                "name_para": {},
-                "short_para": {},
                 "long_para": {
                     "in": [],
                     "out": [],
@@ -313,11 +333,9 @@
             <command>docxtowiki</command>
             <module_name>mediawikiTool.lib.mediawiki_cmd</module_name>
             <class_name>MediaWikiCmd</class_name>
-            <extend_path></extend_path>
-            <init_para></init_para>
+            <extend_path/>
+            <init_para/>
             <cmd_para>{
-                "name_para": {},
-                "short_para": {},
                 "long_para": {
                     "in": [],
                     "out": [],
@@ -355,11 +373,9 @@
             <command>filestowiki</command>
             <module_name>mediawikiTool.lib.mediawiki_cmd</module_name>
             <class_name>MediaWikiCmd</class_name>
-            <extend_path></extend_path>
-            <init_para></init_para>
+            <extend_path/>
+            <init_para/>
             <cmd_para>{
-                "name_para": {},
-                "short_para": {},
                 "long_para": {
                     "in": [],
                     "out": [],
@@ -388,6 +404,301 @@
                         "    -stdpic : 设置该参数可以自动将图片按顺序重命名; 否则将按原文件名命名",
                         "",
                         "示例: filestowiki",
+                        ""
+                ]
+            }
+            </help>
+        </cmd>
+        <cmd>
+            <command>wiki_connect</command>
+            <module_name>mediawikiTool.lib.mediawiki_cmd</module_name>
+            <class_name>MediaWikiSite</class_name>
+            <extend_path/>
+            <init_para/>
+            <cmd_para>{
+                "name_para": {
+                    "path": [],
+                    "scheme": ["http", "https"],
+                    "auth": [
+                        "no-auth", "old-login", "http", "ssl", "OAuth"
+                    ],
+                    "username": [],
+                    "password": [],
+                    "client_pem": [],
+                    "key_pem": [],
+                    "consumer_token": [],
+                    "consumer_secret": [],
+                    "access_token": [],
+                    "access_secret": []
+                }
+            }
+            </cmd_para>
+            <help>{
+                "en": [
+                        "connect to wiki site",
+                        "",
+                        "wiki_connect host [name_para=...] ...",
+                        "    host : the host of wiki site which to connect (not include http://), like:www.mediawiki.org",
+                        "    path : the url path of index.php on wiki site, default '/'",
+                        "    scheme : the protocol of the wiki site, default http",
+                        "    auth : authentication mode, default no-auth, not to auth",
+                        "    username : login username, use when auth is old-login, http",
+                        "    password : login password, use with username",
+                        "    client_pem : client certificate file path, use when auth is ssl",
+                        "    key_pem : private key file path,use with client_pem; if not set means the client pem certificate already contains the private key",
+                        "    consumer_token : consumer token, use when auth is OAuth",
+                        "    consumer_secret : consumer secret, use with consumer_token",
+                        "    access_token : access token, use when auth is OAuth",
+                        "    access_secret : access secret, use with access_secret",
+                        "",
+                        "demo: wiki_connect www.mediawiki.org scheme=https",
+                        ""
+                ],
+                "zh_cn": [
+                        "连接至wiki网站",
+                        "",
+                        "wiki_connect host [name_para=...] ...",
+                        "    host : 要连接到的wiki网站地址(不带http://), 例如:www.mediawiki.org",
+                        "    path : wiki网站上index.php的路径, 默认为'/'",
+                        "    scheme : 网站的连接协议, 默认为http",
+                        "    auth : 验证模式, 默认为no-auth, 不验证",
+                        "    username : 登陆用户名, 验证模式为old-login、http时使用",
+                        "    password : 登陆密码, 与username配套使用",
+                        "    client_pem : 客户端证书文件路径, 验证模式为ssl时使用",
+                        "    key_pem : 私钥文件路径，与client_pem配套使用，如果不送代表client_pem证书中已包含私钥",
+                        "    consumer_token : 消费者令牌, 验证模式为OAuth时使用",
+                        "    consumer_secret : 消费者密钥, 与consumer_token配套使用",
+                        "    access_token : 访问令牌, 验证模式为OAuth时使用",
+                        "    access_secret : 访问密钥, 与access_secret配套使用",
+                        "",
+                        "示例: wiki_connect www.mediawiki.org scheme=https",
+                        ""
+                ]
+            }
+            </help>
+        </cmd>
+        <cmd>
+            <command>wiki_reconnect</command>
+            <module_name>mediawikiTool.lib.mediawiki_cmd</module_name>
+            <class_name>MediaWikiSite</class_name>
+            <extend_path/>
+            <init_para/>
+            <cmd_para>{}
+            </cmd_para>
+            <help>{
+                "en": [
+                        "reconnect to wiki site",
+                        "",
+                        "wiki_reconnect",
+                        "",
+                        "demo: wiki_reconnect",
+                        ""
+                ],
+                "zh_cn": [
+                        "重新连接至wiki网站",
+                        "",
+                        "wiki_reconnect",
+                        "",
+                        "示例: wiki_reconnect",
+                        ""
+                ]
+            }
+            </help>
+        </cmd>
+        <cmd>
+            <command>wiki_site</command>
+            <module_name>mediawikiTool.lib.mediawiki_cmd</module_name>
+            <class_name>MediaWikiSite</class_name>
+            <extend_path/>
+            <init_para/>
+            <cmd_para>{}
+            </cmd_para>
+            <help>{
+                "en": [
+                        "show current connected wiki site",
+                        "",
+                        "wiki_site",
+                        "",
+                        "demo: wiki_site",
+                        ""
+                ],
+                "zh_cn": [
+                        "显示已连接的wiki网站",
+                        "",
+                        "wiki_site",
+                        "",
+                        "示例: wiki_site",
+                        ""
+                ]
+            }
+            </help>
+        </cmd>
+        <cmd>
+            <command>wiki_getpage</command>
+            <module_name>mediawikiTool.lib.mediawiki_cmd</module_name>
+            <class_name>MediaWikiSite</class_name>
+            <extend_path/>
+            <init_para/>
+            <cmd_para>{
+                "long_para": {
+                    "output": [],
+                    "filename": []
+                },
+                "short_para": {
+                    "d": [],
+                    "L": [],
+                    "e": [],
+                    "t": []
+                }
+            }
+            </cmd_para>
+            <help>{
+                "en": [
+                        "get wiki page",
+                        "",
+                        "wiki_getpage title [-output path] [-filename name] [-d] [-L max_level]",
+                        "    title : page title (include namespace), like 'help:title'",
+                        "    -output : output path (not include filename)",
+                        "    -filename : output filename",
+                        "    -d : set to download files in the page",
+                        "    -L : set to get site pages which the current page link to, the para can take a number to set the max level to search link pages, like '-L 3' means just search links below 3 level",
+                        "    -e : set to expand templates",
+                        "    -t : set to get all templates use in the page",
+                        "",
+                        "demo: wiki_getpage 'help:new page'",
+                        ""
+                ],
+                "zh_cn": [
+                        "获取指定的wiki页面",
+                        "",
+                        "wiki_getpage title [-output path] [-filename name] [-d] [-L max_level]",
+                        "    title : 要获取的页面标题(包含命名空间), 例如'帮助:标题'",
+                        "    -output : 输出文件路径(不含文件名)",
+                        "    -filename : 输出文件名",
+                        "    -d : 指定该参数用于下载页面中包含的文件",
+                        "    -L : 指定该参数用于获取当前页面所引用到的其他页面, 同时该参数后可带数字用于设定获取多少层页面, 例如'-L 3'代表只获取3层以内的链接页面",
+                        "    -e : 指定该参数用于展开模板, 意思获取到的页面文本已包含最后展示的模板内容",
+                        "    -t : 指定该参数用于获取当前页面使用到的所有模板页面",
+                        "",
+                        "示例: wiki_getpage 帮助:新建页面",
+                        ""
+                ]
+            }
+            </help>
+        </cmd>
+        <cmd>
+            <command>wiki_upload</command>
+            <module_name>mediawikiTool.lib.mediawiki_cmd</module_name>
+            <class_name>MediaWikiSite</class_name>
+            <extend_path/>
+            <init_para/>
+            <cmd_para>{
+                "long_para": {
+                    "input": [],
+                    "filter": [],
+                    "filter_encoding": [],
+                    "desc": []
+                },
+                "short_para": {
+                    "R": [],
+                    "I": []
+                }
+            }
+            </cmd_para>
+            <help>{
+                "en": [
+                        "upload files to wiki site",
+                        "",
+                        "wiki_upload [-input path] [-filter file] [-filter_encoding utf-8] [-R]",
+                        "    -input : the path of files",
+                        "    -filter : set to filter files, will only upload files in filter content, in filter file each file in one line, format is 'filename|upload name|description'",
+                        "         note: you can also put the filter file to the input path, named 'filter.mt'",
+                        "    -filter_encoding : encoding of the filter file, default will auto judge",
+                        "    -desc : common description to files, use if no filter file",
+                        "    -R : set to recover the exists file on wiki site",
+                        "    -I : set to ignore warnings",
+                        "",
+                        "示例: wiki_upload -input d:\\test\\",
+                        ""
+                ],
+                "zh_cn": [
+                        "上传文件到wiki网站",
+                        "",
+                        "wiki_upload [-input path] [-filter file] [-filter_encoding utf-8] [-R]",
+                        "    -input : 要上传文件所在目录",
+                        "    -filter : 指定过滤文件, 如果有该参数将只上传filter文件的文件, 文件的格式为每行指定一个文件, 格式为'上传文件名|网站文件名|文件描述'",
+                        "         注: 也可以直接将过滤文件放到上传目录，命名为'filter.mt'",
+                        "    -filter_encoding : 过滤文件指定编码, 默认为自动判断",
+                        "    -desc : 文件通用描述, 如果没有过滤文件可以使用其指定说明",
+                        "    -R : 指定该参数遇到网站上已存在的情况将进行覆盖处理",
+                        "    -I : 指定该参数将忽略网站的警告进行上传",
+                        "",
+                        "示例: wiki_upload -input d:\\test\\",
+                        ""
+                ]
+            }
+            </help>
+        </cmd>
+        <cmd>
+            <command>wiki_edit</command>
+            <module_name>mediawikiTool.lib.mediawiki_cmd</module_name>
+            <class_name>MediaWikiSite</class_name>
+            <extend_path/>
+            <init_para/>
+            <cmd_para>{
+                "long_para": {
+                    "input": [],
+                    "encoding": [],
+                    "filter": [],
+                    "filter_encoding": [],
+                    "summary": [],
+                    "FD": [],
+                    "FR": [],
+                    "FI": []
+                },
+                "short_para": {
+                    "R": [],
+                    "U": []
+                }
+            }
+            </cmd_para>
+            <help>{
+                "en": [
+                        "edit pages to wiki site",
+                        "",
+                        "wiki_edit [-input path] [-filter file] [-filter_encoding utf-8] [-R]",
+                        "    -input : the path of page files",
+                        "    -encoding : encoding of page files",
+                        "    -filter : set to filter files, will only upload files in filter content, in filter file each file in one line, format is 'filename|title (include namespace)|summary|if upload files(true/false)'",
+                        "         note: you can also put the filter file to the input path, named 'filter.mt'",
+                        "    -filter_encoding : encoding of the filter file, default will auto judge",
+                        "    -summary : common edit summary",
+                        "    -R : set to recover the exists page on wiki site",
+                        "    -U : set to allow upload page's files",
+                        "    -FD : common description to upload files",
+                        "    -FR : set to recover the exists file on wiki site, use when set '-U'",
+                        "    -FI : set to ignore files upload warnings",
+                        "",
+                        "demo: wiki_edit -input d:\\test\\",
+                        ""
+                ],
+                "zh_cn": [
+                        "编辑wiki网站页面",
+                        "",
+                        "wiki_edit [-input path] [-filter file] [-filter_encoding utf-8] [-R]",
+                        "    -input : 处理页面文件所在目录",
+                        "    -encoding : 获取文件的编码",
+                        "    -filter : 指定过滤文件, 如果有该参数将只上传filter文件的文件, 文件的格式为每行指定一个文件, 格式为'文件名|页面标题(含命名空间)|摘要|是否上传附件(true/false)'",
+                        "         注: 也可以直接将过滤文件放到页面目录，命名为'filter.mt'",
+                        "    -filter_encoding : 过滤文件指定编码, 默认为自动判断",
+                        "    -summary : 文档摘要",
+                        "    -R : 指定该参数遇到网站上已存在的情况将进行覆盖处理",
+                        "    -U : 指定该参数将上传页面对应的图片文件",
+                        "    -FR : 指定该参数将在上传文件附件时发现已存在将覆盖",
+                        "    -FI : 指定该参数将忽略网站的警告进行附件上传",
+                        "    -FD : 上传图片附件的通用描述, 例如 '-FD 描述'",
+                        "",
+                        "示例: wiki_edit -input d:\\test\\",
                         ""
                 ]
             }
