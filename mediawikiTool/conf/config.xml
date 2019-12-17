@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <console>
     <!--
         控制台配置
@@ -26,7 +27,7 @@
     -->
     <name>mediawikiTool</name>
     <shell_cmd_name>wikitool</shell_cmd_name>
-    <version>0.6.0</version>
+    <version>0.7.0</version>
     <language>en</language>
     <i18n/>
     <shell_encoding>GBK</shell_encoding>
@@ -370,6 +371,87 @@
             </help>
         </cmd>
         <cmd>
+            <command>xlstowiki</command>
+            <module_name>mediawikiTool.lib.mediawiki_cmd</module_name>
+            <class_name>MediaWikiCmd</class_name>
+            <extend_path/>
+            <init_para/>
+            <cmd_para>{
+                "long_para": {
+                    "in": [],
+                    "out": [],
+                    "name": [],
+                    "para_name": []
+                }
+            }
+            </cmd_para>
+            <help>{
+                "en": [
+                        "convert excel file to mediawiki format",
+                        "",
+                        "xlstowiki -in file [-out outpath] [-name title]",
+                        "    -in : Excel file path (include filename), if just filename then search on the current working directory",
+                        "    -out : the MediaWiki file output path, If not specified to represent output on the current working directory",
+                        "    -name : MediaWiki page title, If you do not specify the filename that represents the use of Markdown filename (without the extension)",
+                        "    -para_name : the convert para tag name (get para value from xlstowiki.mt file), If you do not specify the para_name then use the output name as para_name(without the extension)",
+                        "",
+                        "demo: xlstowiki -in xlstowiki.xlsx",
+                        "",
+                        "Note: the command would auto get convert para from 'xlstowiki.mt' in the input path, the file content is a standard JSON dict string, the Key of dict is the para_name, Value is the convert para values, define as follow:",
+                        "    show_all_sheet : if show all sheet (true/false)",
+                        "    sheet_index_list : use if show_all_sheet is false, list the sheet index, first index is 0, like [0, 1]",
+                        "    sheet_name_list : use if show_all_sheet is false, list the sheet name, like [\"sheet1\", \"sheet2\"]",
+                        "    default_para : default convert para，if a sheet can't find convert para from sheet_index_para_list and sheet_name_para_list, then use the default para",
+                        "        has_head : if has head line (true/false)",
+                        "        head_row : the head line row index (first index is 0)",
+                        "        data_row_start : start row index of data, first index is 0",
+                        "        data_row_end : end row index of data, set -1 to get all rows",
+                        "        data_col_start : start col index of data, first index is 0",
+                        "        data_cols_end : end col index of data, set -1 to get all cols",
+                        "        col_filter : list the col index you want to show, you can control show order with this para, null list means show all cols, like [0, 3, 5]",
+                        "        head_trans_dict : head line show text translate dict，key is the text in head line, value is the text you want to show",
+                        "            like: {\"head_title1\": \"my title1\", \"title2\": \"my title12\"}",
+                        "        col_trans_dict : cols data translate dict，key the index of col (use string format)，value is a translate dict (key translate to value)",
+                        "            the follow demo set the cols of 3 and 4 will processed translate: {\"3\": {\"item1\": \"my item1\"}, \"4\": {\"male\": \"my show string\"}}",
+                        "    sheet_index_para_list : self convert para for special sheet with index, key is the string of sheet index, value just like default_para (you can only list part of the paras, if not find here then will use the para of default_para)",
+                        "    sheet_name_para_list : self convert para for special sheet with name, key is the sheet name, just like sheet_index_para_list",
+                        ""
+                ],
+                "zh_cn": [
+                        "将Excel格式文件转换为mediawiki格式",
+                        "",
+                        "xlstowiki -in file [-out outpath] [-name title]",
+                        "    -in : Excel文件路径(含名称), 如果在当前工作目录下可以只输入名称",
+                        "    -out : 要输出的MediaWiki文件路径, 如果不指定代表输出在当前工作目录上",
+                        "    -name : MediaWiki标题名字，如果不指定代表使用Markdown的文件名(不含扩展名)",
+                        "    -para_name : Excel转换的参数名(从xlstowiki.mt中获取参数), 如果不指定将使用输出的文件名(不含扩展名)作为参数名",
+                        "",
+                        "示例: xlstowiki -in xlstowiki.xlsx",
+                        "",
+                        "注意: Excel的转换参数将自动从输入文件所在目录中的'xlstowiki.mt'文件中获取, 文件内容是一个标准JSON字典字符串, 字典的Key是转换参数名, Value是该参数名对应的具体转换参数, 定义如下:",
+                        "    show_all_sheet : 是否显示所有的sheet页 (true/false)",
+                        "    sheet_index_list : 如果show_all_sheet为False, 列出要显示的页索引, 从0开始, 例如[0, 1]",
+                        "    sheet_name_list : 如果show_all_sheet为False, 列出要显示的页名, 例如[\"sheet1\", \"sheet2\"]",
+                        "    default_para : 默认的内容转换参数，如果转换参数在sheet_index_para_list和sheet_name_para_list找不到, 则会使用这里的参数",
+                        "        has_head : 是否包含表格头 (true/false)",
+                        "        head_row : 表格头所在行",
+                        "        data_row_start : 数据开始行, 从0开始",
+                        "        data_row_end : 数据结束行, 如果不设置结束行，填-1",
+                        "        data_col_start : 数据开始列, 从0开始",
+                        "        data_cols_end : 数据结束列，如果不设置结束列，填-1",
+                        "        col_filter : 列出要显示的列索引，同时也可以通过该参数控制显示的顺序，空数组代表按顺序显示所有列, 例如[0, 3, 5]",
+                        "        head_trans_dict : 表格头的名字转换参数，为一个字典，key为sheet页中字符串, value为要转换显示的字符串",
+                        "            例如：{\"head_title1\": \"标题1\", \"title2\": \"标题2\"}",
+                        "        col_trans_dict : 列数据的转换参数，为一个字典，key为str(列索引)，value为一个值和显示内容的转换字典",
+                        "            例如以下将定义列索引为3、4的列值将按字典进行转换处理: {\"3\": {\"item1\": \"项1\"}, \"4\": {\"male\": \"男\"}}",
+                        "    sheet_index_para_list : 按页位置定义的个性处理参数，key为索引数字, value为与default_para一样的参数(可以只列部分参数，缺失的参数项使用default_para的值)",
+                        "    sheet_name_para_list : 按页名字定义的个性处理参数, key为页名，与sheet_index_para_list类似",
+                        ""
+                ]
+            }
+            </help>
+        </cmd>
+        <cmd>
             <command>filestowiki</command>
             <module_name>mediawikiTool.lib.mediawiki_cmd</module_name>
             <class_name>MediaWikiCmd</class_name>
@@ -379,7 +461,12 @@
                 "long_para": {
                     "in": [],
                     "out": [],
-                    "stdpic": []
+                    "stdpic": [],
+                    "add_file_link": [],
+                    "add_category": [],
+                    "add_comments": [],
+                    "add_filter": [],
+                    "summary": []
                 }
             }
             </cmd_para>
@@ -391,6 +478,12 @@
                         "    -in : input path, If not specified to represent on the current working directory",
                         "    -out : the MediaWiki file output path, If not specified to represent output on the current working directory",
                         "    -stdpic : Set this parameter to automatically rename the pictures in order;Otherwise it will be named after the original file name",
+                        "    -add_file_link : 是否在文件头添加原文件链接",
+                        "        注: 原文件将复制到输出目录的'source_file_list'中, 并加入filter.mt文件",
+                        "    -add_category : 在文件头添加分类信息, 参数后面多个分类使用逗号','分隔",
+                        "    -add_comments : 指定是否在文件结尾增加评论框",
+                        "    -add_filter : 指定是否添加到上传的filter.mt文件中(文件所在目录)",
+                        "    -summary : filter.mt文件中的摘要信息",
                         "",
                         "demo: filestowiki",
                         ""
@@ -402,6 +495,12 @@
                         "    -in : 输入文件路径, 如果部指定代表在当前工作目录",
                         "    -out : 要输出的MediaWiki文件路径, 如果不指定代表输出在当前工作目录上",
                         "    -stdpic : 设置该参数可以自动将图片按顺序重命名; 否则将按原文件名命名",
+                        "    -add_file_link : 是否在文件头添加原文件链接",
+                        "        注: 原文件将复制到输出目录的'source_file_list'中, 并加入filter.mt文件",
+                        "    -add_category : 在文件头添加分类信息, 参数后面多个分类使用逗号','分隔",
+                        "    -add_comments : 指定是否在文件结尾增加评论框",
+                        "    -add_filter : 指定是否添加到上传的filter.mt文件中(文件所在目录)",
+                        "    -summary : filter.mt文件中的摘要信息",
                         "",
                         "示例: filestowiki",
                         ""

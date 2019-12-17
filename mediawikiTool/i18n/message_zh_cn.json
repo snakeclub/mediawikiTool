@@ -59,5 +59,7 @@
     "fail": "失败",
     "page [$1] has been in wiki site!": "页面[$1]在wiki网站已存在",
     "edit page [$1] > [$2]": "编辑页面[$1] > [$2]",
-    "call cmd by shell mode: $1": "以shell模式执行命令: $1"
+    "call cmd by shell mode: $1": "以shell模式执行命令: $1",
+    "edit page [$1]:  upload files": "编辑页面[$1]: 上传文件",
+    "get convert para from 'xlstowiki.mt[$1]'": "从'xlstowiki.mt[$1]'中获取转换参数"
 }
