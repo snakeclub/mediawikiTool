@@ -21,19 +21,23 @@ import traceback
 import platform
 import subprocess
 import time
+import datetime
 import copy
+import json
 try:
     import chardet
 except:
     pass
 import mwclient
 import xlrd
+from prompt_toolkit.shortcuts import ProgressBar
 from HiveNetLib.base_tools.run_tool import RunTool
 from HiveNetLib.prompt_plus import PromptPlus
 from HiveNetLib.base_tools.file_tool import FileTool
 from HiveNetLib.base_tools.string_tool import StringTool
 from HiveNetLib.simple_i18n import _
 from HiveNetLib.simple_console.base_cmd import CmdBaseFW
+from HiveNetLib.generic import CResult
 # 根据当前文件路径将包路径纳入，在非安装的情况下可以引用到
 sys.path.append(os.path.abspath(os.path.join(
     os.path.dirname(__file__), os.path.pardir, os.path.pardir)))
@@ -73,19 +77,21 @@ class MediaWikiCmd(CmdBaseFW):
     #############################
     # 实际处理函数
     #############################
-    def _cmd_dealfun(self, message='', cmd='', cmd_para='', **kwargs):
+    def _cmd_dealfun(self, message='', cmd='', cmd_para='', prompt_obj=None, **kwargs):
         """
         通用处理函数，通过cmd区别调用实际的处理函数
 
         @param {string} message='' - prompt提示信息
         @param {string} cmd - 执行的命令key值
         @param {string} cmd_para - 传入的命令参数（命令后的字符串，去掉第一个空格）
+        @param {PromptPlus} prompt_obj=None - 传入调用函数的PromptPlus对象，可以通过该对象的一些方法控制输出显示
         @param {kwargs} - 传入的主进程的初始化kwargs对象
 
-        @return {string|iter_string} - 执行命令完成后要输到屏幕的内容，可以是iter对象（yield返回）
-            注：如果是on_abort和on_exit可以返回CResult对象
+        @returns {CResult} - 命令执行结果，可通过返回错误码10101通知框架退出命令行, 同时也可以通过CResult对象的
+            print_str属性要求框架进行打印处理
         """
         # 获取真实执行的函数
+        self._prompt_obj = prompt_obj  # 传递到对象内部处理
         _real_dealfun = None  # 真实调用的函数
         if 'ignore_case' in kwargs.keys() and kwargs['ignore_case']:
             # 区分大小写
@@ -98,48 +104,53 @@ class MediaWikiCmd(CmdBaseFW):
 
         # 执行函数
         if _real_dealfun is not None:
-            return _real_dealfun(message=message, cmd=cmd, cmd_para=cmd_para, **kwargs)
+            return _real_dealfun(message=message, cmd=cmd, cmd_para=cmd_para, prompt_obj=prompt_obj, **kwargs)
         else:
-            return _("'$1' is not support command!", cmd)
+            prompt_obj.prompt_print(_("'$1' is not support command!", cmd))
+            return CResult(code='11404', i18n_msg_paras=(cmd, ))
 
     #############################
     # 实际处理函数
     #############################
-    def _mdtowiki_cmd_dealfun(self, message='', cmd='', cmd_para='', **kwargs):
+    def _mdtowiki_cmd_dealfun(self, message='', cmd='', cmd_para='', prompt_obj=None, **kwargs):
         """
         将markdown格式文件转换为mediawiki格式
 
         @param {string} message='' - prompt提示信息
         @param {string} cmd - 执行的命令key值
         @param {string} cmd_para - 传入的命令参数（命令后的字符串，去掉第一个空格）
+        @param {PromptPlus} prompt_obj=None - 传入调用函数的PromptPlus对象，可以通过该对象的一些方法控制输出显示
+        @param {kwargs} - 传入的主进程的初始化kwargs对象
 
-        @return {string} - 执行命令完成后要输到屏幕的内容
+        @returns {CResult} - 命令执行结果，可通过返回错误码10101通知框架退出命令行, 同时也可以通过CResult对象的
+            print_str属性要求框架进行打印处理
         """
+        _ok_result = CResult(code='00000')
         try:
-            if not self._para_dict_check(cmd=cmd, cmd_para=cmd_para):
-                return ''
+            if not self._para_dict_check(cmd=cmd, cmd_para=cmd_para, prompt_obj=prompt_obj):
+                return _ok_result
 
             # 展示处理信息
-            print(
+            prompt_obj.prompt_print(
                 '%s ( %s ):' % (
                     _('convert info'),
                     _('change stander pic name' if self._para_dict['stdpic']
                       else 'use source pic name')
                 )
             )
-            print('  %s: %s' % (_('source file'), self._para_dict['in']))
-            print('  %s: %s' % (_('out path'), self._para_dict['out']))
-            print('  %s: %s' % (_('wiki page title'), self._para_dict['real_name']))
-            print('  %s: %s' % (_('copy pic path'), self._para_dict['pic_dir']))
-            print('')
-            print('%s  =================>' % (_('begin convert'), ))
-            print('')
+            prompt_obj.prompt_print('  %s: %s' % (_('source file'), self._para_dict['in']))
+            prompt_obj.prompt_print('  %s: %s' % (_('out path'), self._para_dict['out']))
+            prompt_obj.prompt_print('  %s: %s' % (_('wiki page title'), self._para_dict['real_name']))
+            prompt_obj.prompt_print('  %s: %s' % (_('copy pic path'), self._para_dict['pic_dir']))
+            prompt_obj.prompt_print('')
+            prompt_obj.prompt_print('%s  =================>' % (_('begin convert'), ))
+            prompt_obj.prompt_print('')
 
             # 删除原有复制图片
             self._create_pic_dir()
 
             # 预处理markdown文件
-            print('\r\n%s %s: ' % (_('begin'), _('copy pic file')))
+            prompt_obj.prompt_print('\n%s %s: ' % (_('begin'), _('copy pic file')))
             _md_text = FileTool.get_file_text(self._para_dict['in'], encoding=None)
 
             # 增加文件名中有()和[]的处理规则的影响支持
@@ -158,102 +169,107 @@ class MediaWikiCmd(CmdBaseFW):
                 # 转换回来
                 _temp_text = _temp_text.replace('{{__PRE_DEAL_NAME__}}', self._para_dict['real_name'])
 
-            print('%s %s' % (_('copy pic file'), _('done')))
+            prompt_obj.prompt_print('%s %s' % (_('copy pic file'), _('done')))
 
             with open(
                 os.path.join(self._para_dict['out'], self._para_dict['name'] + '_temp.md'),
                 "w", encoding='utf-8'
             ) as f:
                 f.write(_temp_text)
-            print('\r\n%s %s' % (_('pre convert to temp file'), _('done')))
+            prompt_obj.prompt_print('\n%s %s' % (_('pre convert to temp file'), _('done')))
 
             # 调用Pandoc进行转换处理
-            print('%s:' % (_('use Pandoc convert'), ))
+            prompt_obj.prompt_print('%s:' % (_('use Pandoc convert'), ))
             if platform.system() == 'Windows':
                 # Win平台要先执行chcp 65001命令
                 _sys_cmd = 'chcp 65001'
                 self._console_global_para['shell_encoding'] = 'utf-8'
-                print('%s: %s' % (_('execute'), _sys_cmd))
+                prompt_obj.prompt_print('%s: %s' % (_('execute'), _sys_cmd))
                 if(self._exe_syscmd(_sys_cmd, shell_encoding='utf-8') != 0):
-                    return ''
+                    return CResult(code='20999')
 
             # 执行转换命令
             _sys_cmd = 'pandoc %s -f markdown -t mediawiki -s -o %s' % (
                 os.path.join(self._para_dict['out'], self._para_dict['name'] + '_temp.md'),
                 os.path.join(self._para_dict['out'], self._para_dict['real_name'] + '.txt')
             )
-            print('%s: %s' % (_('execute'), _sys_cmd))
+            prompt_obj.prompt_print('%s: %s' % (_('execute'), _sys_cmd))
             if(self._exe_syscmd(_sys_cmd, shell_encoding='utf-8') != 0):
-                return ''
+                return CResult(code='20999')
 
             # 删除临时文件
             FileTool.remove_file(os.path.join(
                 self._para_dict['out'], self._para_dict['name'] + '_temp.md'))
 
-            print('\r\n=================>  %s %s' % (_('convert'), _('done')))
+            prompt_obj.prompt_print('\n=================>  %s %s' % (_('convert'), _('done')))
         except Exception as e:
-            _prin_str = '%s (%s):\r\n%s' % (
+            _prin_str = '%s (%s):\n%s' % (
                 _('execution exception'), str(e), traceback.format_exc()
             )
-            print(_prin_str)
+            prompt_obj.prompt_print(_prin_str)
+            return CResult(code='20999')
 
         # 结束
-        return ''
+        return _ok_result
 
-    def _docxtowiki_cmd_dealfun(self, message='', cmd='', cmd_para='', **kwargs):
+    def _docxtowiki_cmd_dealfun(self, message='', cmd='', cmd_para='', prompt_obj=None, **kwargs):
         """
         将docx格式文件转换为mediawiki格式
 
         @param {string} message='' - prompt提示信息
         @param {string} cmd - 执行的命令key值
         @param {string} cmd_para - 传入的命令参数（命令后的字符串，去掉第一个空格）
+        @param {PromptPlus} prompt_obj=None - 传入调用函数的PromptPlus对象，可以通过该对象的一些方法控制输出显示
+        @param {kwargs} - 传入的主进程的初始化kwargs对象
 
-        @return {string} - 执行命令完成后要输到屏幕的内容
+        @returns {CResult} - 命令执行结果，可通过返回错误码10101通知框架退出命令行, 同时也可以通过CResult对象的
+            print_str属性要求框架进行打印处理
         """
+        _ok_result = CResult(code='00000')
         try:
-            if not self._para_dict_check(cmd=cmd, cmd_para=cmd_para):
-                return ''
+            if not self._para_dict_check(cmd=cmd, cmd_para=cmd_para, prompt_obj=prompt_obj):
+                return _ok_result
 
             self._para_dict['stdpic'] = True
 
             # 展示处理信息
-            print(
+            prompt_obj.prompt_print(
                 '%s:' % (
                     _('convert info')
                 )
             )
-            print('  %s: %s' % (_('source file'), self._para_dict['in']))
-            print('  %s: %s' % (_('out path'), self._para_dict['out']))
-            print('  %s: %s' % (_('wiki page title'), self._para_dict['real_name']))
-            print('  %s: %s' % (_('copy pic path'), self._para_dict['pic_dir']))
-            print('')
-            print('%s  =================>' % (_('begin convert'), ))
-            print('')
+            prompt_obj.prompt_print('  %s: %s' % (_('source file'), self._para_dict['in']))
+            prompt_obj.prompt_print('  %s: %s' % (_('out path'), self._para_dict['out']))
+            prompt_obj.prompt_print('  %s: %s' % (_('wiki page title'), self._para_dict['real_name']))
+            prompt_obj.prompt_print('  %s: %s' % (_('copy pic path'), self._para_dict['pic_dir']))
+            prompt_obj.prompt_print('')
+            prompt_obj.prompt_print('%s  =================>' % (_('begin convert'), ))
+            prompt_obj.prompt_print('')
 
             # 删除原有复制图片
             self._create_pic_dir()
 
             # 先将docx转换为md
-            print('%s: ' % (_('change docx file to markdown'), ))
+            prompt_obj.prompt_print('%s: ' % (_('change docx file to markdown'), ))
             if platform.system() == 'Windows':
                 # Win平台要先执行chcp 65001命令
                 _sys_cmd = 'chcp 65001'
                 self._console_global_para['shell_encoding'] = 'utf-8'
-                print('%s: %s' % (_('execute'), _sys_cmd))
+                prompt_obj.prompt_print('%s: %s' % (_('execute'), _sys_cmd))
                 if(self._exe_syscmd(_sys_cmd, shell_encoding='utf-8') != 0):
-                    return ''
+                    return CResult(code='20999')
 
             _sys_cmd = 'pandoc %s -f docx -t markdown -s -o %s --extract-media=%s' % (
                 self._para_dict['in'],
                 os.path.join(self._para_dict['out'], self._para_dict['name'] + '_temp.md'),
                 self._para_dict['pic_dir']
             )
-            print('%s: %s' % (_('execute'), _sys_cmd))
+            prompt_obj.prompt_print('%s: %s' % (_('execute'), _sys_cmd))
             if(self._exe_syscmd(_sys_cmd, shell_encoding='utf-8') != 0):
-                return ''
+                return CResult(code='20999')
 
             # 预处理markdown文件
-            print('\r\n%s %s: ' % (_('begin'), _('begin copy pic file')))
+            prompt_obj.prompt_print('\n%s %s: ' % (_('begin'), _('begin copy pic file')))
             _md_text = FileTool.get_file_text(os.path.join(
                 self._para_dict['out'], self._para_dict['name'] + '_temp.md'), encoding=None)
             # 增加文件名中有()和[]的处理规则的影响支持
@@ -272,51 +288,56 @@ class MediaWikiCmd(CmdBaseFW):
                 # 转换回来
                 _temp_text = _temp_text.replace('{{__PRE_DEAL_NAME__}}', self._para_dict['real_name'])
 
-            print('%s %s' % (_('copy pic file'), _('done')))
+            prompt_obj.prompt_print('%s %s' % (_('copy pic file'), _('done')))
             with open(
                 os.path.join(self._para_dict['out'], self._para_dict['name'] + '_temp.md'),
                 "w", encoding='utf-8'
             ) as f:
                 f.write(_temp_text)
-            print('\r\n%s %s' % (_('pre convert to temp file'), _('done')))
+            prompt_obj.prompt_print('\n%s %s' % (_('pre convert to temp file'), _('done')))
 
             # 调用Pandoc进行转换处理
-            print('\r\n%s:' % (_('use Pandoc convert'), ))
+            prompt_obj.prompt_print('\n%s:' % (_('use Pandoc convert'), ))
 
             # 执行转换命令
             _sys_cmd = 'pandoc %s -f markdown -t mediawiki -s -o %s' % (
                 os.path.join(self._para_dict['out'], self._para_dict['name'] + '_temp.md'),
                 os.path.join(self._para_dict['out'], self._para_dict['real_name'] + '.txt')
             )
-            print('%s: %s' % (_('execute'), _sys_cmd))
+            prompt_obj.prompt_print('%s: %s' % (_('execute'), _sys_cmd))
             if(self._exe_syscmd(_sys_cmd, shell_encoding='utf-8') != 0):
-                return ''
+                return CResult(code='20999')
 
             # 删除临时文件
             FileTool.remove_file(os.path.join(
                 self._para_dict['out'], self._para_dict['name'] + '_temp.md'))
             FileTool.remove_dir(os.path.join(self._para_dict['pic_dir'], 'media'))
 
-            print('\r\n=================>  %s %s' % (_('convert'), _('done')))
+            prompt_obj.prompt_print('\n=================>  %s %s' % (_('convert'), _('done')))
         except Exception as e:
-            _prin_str = '%s (%s):\r\n%s' % (
+            _prin_str = '%s (%s):\n%s' % (
                 _('execution exception'), str(e), traceback.format_exc()
             )
-            print(_prin_str)
+            prompt_obj.prompt_print(_prin_str)
+            return CResult(code='20999')
 
         # 结束
-        return ''
+        return _ok_result
 
-    def _xlstowiki_cmd_dealfun(self, message='', cmd='', cmd_para='', **kwargs):
+    def _xlstowiki_cmd_dealfun(self, message='', cmd='', cmd_para='', prompt_obj=None, **kwargs):
         """
         将Excel格式文件转换为mediawiki格式
 
         @param {string} message='' - prompt提示信息
         @param {string} cmd - 执行的命令key值
         @param {string} cmd_para - 传入的命令参数（命令后的字符串，去掉第一个空格）
+        @param {PromptPlus} prompt_obj=None - 传入调用函数的PromptPlus对象，可以通过该对象的一些方法控制输出显示
+        @param {kwargs} - 传入的主进程的初始化kwargs对象
 
-        @return {string} - 执行命令完成后要输到屏幕的内容
+        @returns {CResult} - 命令执行结果，可通过返回错误码10101通知框架退出命令行, 同时也可以通过CResult对象的
+            print_str属性要求框架进行打印处理
         """
+        _ok_result = CResult(code='00000')
         try:
             # 参数处理
             _run_para = {
@@ -329,8 +350,8 @@ class MediaWikiCmd(CmdBaseFW):
             # 参数检查及初始化
             if _run_para['-in'] == '' or not os.path.exists(_run_para['-in']) or not os.path.isfile(_run_para['-in']):
                 # 输入文件不存在
-                print(_('File \'$1\' not exists, please check [-in] para!', _run_para['-in']))
-                return ''
+                prompt_obj.prompt_print(_('File \'$1\' not exists, please check [-in] para!', _run_para['-in']))
+                return CResult(code='20999')
 
             _run_para['-in'] = os.path.realpath(_run_para['-in'])  # 获取全路径
             _run_para['in_dir'] = FileTool.get_file_path(_run_para['-in'])
@@ -347,16 +368,16 @@ class MediaWikiCmd(CmdBaseFW):
                 _run_para['-name'] = FileTool.get_file_name_no_ext(_run_para['-in'])
 
             # 展示处理信息
-            print(
+            prompt_obj.prompt_print(
                 '%s:' % (
                     _('convert info')
                 )
             )
-            print('  %s: %s' % (_('source file'), _run_para['-in']))
-            print('  %s: %s' % (_('out path'), _run_para['-out']))
-            print('')
-            print('%s  =================>' % (_('begin convert'), ))
-            print('')
+            prompt_obj.prompt_print('  %s: %s' % (_('source file'), _run_para['-in']))
+            prompt_obj.prompt_print('  %s: %s' % (_('out path'), _run_para['-out']))
+            prompt_obj.prompt_print('')
+            prompt_obj.prompt_print('%s  =================>' % (_('begin convert'), ))
+            prompt_obj.prompt_print('')
 
             # 获取转换具体参数
             _convert_para = {
@@ -387,7 +408,7 @@ class MediaWikiCmd(CmdBaseFW):
                 if _para_name == '':
                     _para_name = _run_para['-name']
                 if _para_name in _temp_para.keys():
-                    print(_("get convert para from 'xlstowiki.mt[$1]'", _para_name))
+                    prompt_obj.prompt_print(_("get convert para from 'xlstowiki.mt[$1]'", _para_name))
                     _convert_para.update(
                         _temp_para[_para_name]
                     )
@@ -427,26 +448,31 @@ class MediaWikiCmd(CmdBaseFW):
             ) as f:
                 f.write(_wiki_text)
 
-            print('\r\n=================>  %s %s' % (_('convert'), _('done')))
+            prompt_obj.prompt_print('\n=================>  %s %s' % (_('convert'), _('done')))
         except Exception as e:
-            _prin_str = '%s (%s):\r\n%s' % (
+            _prin_str = '%s (%s):\n%s' % (
                 _('execution exception'), str(e), traceback.format_exc()
             )
-            print(_prin_str)
+            prompt_obj.prompt_print(_prin_str)
+            return CResult(code='20999')
 
         # 结束
-        return ''
+        return _ok_result
 
-    def _filestowiki_cmd_dealfun(self, message='', cmd='', cmd_para='', **kwargs):
+    def _filestowiki_cmd_dealfun(self, message='', cmd='', cmd_para='', prompt_obj=None, **kwargs):
         """
         将指定目录下的文件批量转换为mediawiki格式
 
         @param {string} message='' - prompt提示信息
         @param {string} cmd - 执行的命令key值
         @param {string} cmd_para - 传入的命令参数（命令后的字符串，去掉第一个空格）
+        @param {PromptPlus} prompt_obj=None - 传入调用函数的PromptPlus对象，可以通过该对象的一些方法控制输出显示
+        @param {kwargs} - 传入的主进程的初始化kwargs对象
 
-        @return {string} - 执行命令完成后要输到屏幕的内容
+        @returns {CResult} - 命令执行结果，可通过返回错误码10101通知框架退出命令行, 同时也可以通过CResult对象的
+            print_str属性要求框架进行打印处理
         """
+        _ok_result = CResult(code='00000')
         try:
             # 获取参数及处理参数
             _run_para = {
@@ -461,8 +487,9 @@ class MediaWikiCmd(CmdBaseFW):
                 _run_para['-in'] = self._console_global_para['work_path']
             else:
                 if not os.path.exists(_run_para['-in']) or not os.path.isdir(_run_para['-in']):
-                    print(_("Path '$1' not exists, please check [-in] para!", _run_para['-in']))
-                    return ''
+                    prompt_obj.prompt_print(_("Path '$1' not exists, please check [-in] para!", _run_para['-in']))
+                    return CResult(code='20999')
+
                 _run_para['-in'] = os.path.realpath(_run_para['-in'])
             if _run_para['-out'] == '':
                 _run_para['-out'] = self._console_global_para['work_path']
@@ -479,40 +506,43 @@ class MediaWikiCmd(CmdBaseFW):
                     FileTool.create_dir(_run_para['source_file_dir'])
 
             # 遍历文件并进行处理
-            print(_("begin convert files in $1", _run_para['-in']) + ' =======================>')
-            print('')
+            prompt_obj.prompt_print(_("begin convert files in $1", _run_para['-in']) + ' =======================>')
+            prompt_obj.prompt_print('')
             _file_list = FileTool.get_filelist(path=_run_para['-in'], is_fullname=True)
             for _file in _file_list:
                 _ext = FileTool.get_file_ext(_file)
                 if _ext == 'md':
-                    print('%s: %s' % (_('convert'), _file))
+                    prompt_obj.prompt_print('%s: %s' % (_('convert'), _file))
                     self._mdtowiki_cmd_dealfun(
                         message=message, cmd='mdtowiki',
                         cmd_para="-in '%s' -out '%s'%s" % (
                             _file, _run_para['-out'], ' -stdpic' if ('-stdpic' in _run_para.keys()) else ''
                         ),
+                        prompt_obj=prompt_obj,
                         **kwargs
                     )
                 elif _ext == 'docx':
-                    print('%s: %s' % (_('convert'), _file))
+                    prompt_obj.prompt_print('%s: %s' % (_('convert'), _file))
                     self._docxtowiki_cmd_dealfun(
                         message=message, cmd='docxtowiki',
                         cmd_para="-in '%s' -out '%s'" % (
                             _file, _run_para['-out']
                         ),
+                        prompt_obj=prompt_obj,
                         **kwargs
                     )
                 elif _ext in ['xls', 'xlsx']:
-                    print('%s: %s' % (_('convert'), _file))
+                    prompt_obj.prompt_print('%s: %s' % (_('convert'), _file))
                     self._xlstowiki_cmd_dealfun(
                         message=message, cmd='xlstowiki',
                         cmd_para="-in '%s' -out '%s'" % (
                             _file, _run_para['-out']
                         ),
+                        prompt_obj=prompt_obj,
                         **kwargs
                     )
                 else:
-                    print('%s: %s' % (_('not support file format'), _file))
+                    prompt_obj.prompt_print('%s: %s' % (_('not support file format'), _file))
                     continue
 
                 # 进行额外处理
@@ -566,27 +596,28 @@ class MediaWikiCmd(CmdBaseFW):
                     )
 
             # 处理完成
-            print('\r\n=======================>  %s %s' % (_('convert files'), _('done')))
+            prompt_obj.prompt_print('\n=======================>  %s %s' % (_('convert files'), _('done')))
         except Exception as e:
-            _prin_str = '%s (%s):\r\n%s' % (
+            _prin_str = '%s (%s):\n%s' % (
                 _('execution exception'), str(e), traceback.format_exc()
             )
-            print(_prin_str)
+            prompt_obj.prompt_print(_prin_str)
+            return CResult(code='20999')
 
         # 结束
-        return ''
+        return _ok_result
 
     #############################
     # 内部函数
     #############################
-    def _para_dict_check(self, cmd='', cmd_para=''):
+    def _para_dict_check(self, cmd='', cmd_para='', prompt_obj=None, **kwargs):
         """
         检查并生成
 
         @param {string} cmd - 执行的命令key值
         @param {string} cmd_para - 传入的命令参数（命令后的字符串，去掉第一个空格）
 
-        @return {string} - 如果返回空字符串代表成功，有值的字符串代表失败
+        @return {bool} - 如果返回空字符串代表成功，有值的字符串代表失败
         """
         # 获取命令执行参数
         _cmd_list = PromptPlus.get_cmd_para_list(cmd_para)
@@ -612,7 +643,7 @@ class MediaWikiCmd(CmdBaseFW):
         # 参数检查及初始化
         if self._para_dict['in'] == '' or not os.path.exists(self._para_dict['in']) or not os.path.isfile(self._para_dict['in']):
             # 输入文件不存在
-            print(_('File \'$1\' not exists, please check [-in] para!', self._para_dict['in']))
+            prompt_obj.prompt_print(_('File \'$1\' not exists, please check [-in] para!', self._para_dict['in']))
             return False
 
         self._para_dict['in'] = os.path.realpath(self._para_dict['in'])  # 获取全路径
@@ -677,7 +708,7 @@ class MediaWikiCmd(CmdBaseFW):
         # 检查文件是否已经处理过
         if _src in self._para_dict['pic_list']:
             _name = self._para_dict['pic_list'][_src]
-            print('%s: %s -> %s %s' % (_('copy pic file'), _src, _name, _('done')))
+            self._prompt_obj.prompt_print('%s: %s -> %s %s' % (_('copy pic file'), _src, _name, _('done')))
         else:
             # 未处理过
             if self._para_dict['stdpic']:
@@ -707,11 +738,11 @@ class MediaWikiCmd(CmdBaseFW):
             # 复制或下载文件
             try:
                 self._down_md_pic(_src, os.path.join(self._para_dict['pic_dir'], _name))
-                print('%s: %s -> %s %s' % (_('copy pic file'), _src, _name, _('done')))
+                self._prompt_obj.prompt_print('%s: %s -> %s %s' % (_('copy pic file'), _src, _name, _('done')))
             except Exception as e:
                 # 提示
-                print(
-                    '%s: %s -> %s %s ( %s ):\r\n %s' % (
+                self._prompt_obj.prompt_print(
+                    '%s: %s -> %s %s ( %s ):\n %s' % (
                         _('copy pic file'), _src, _name, _('execution exception'), str(e),
                         traceback.format_exc()
                     )
@@ -762,24 +793,24 @@ class MediaWikiCmd(CmdBaseFW):
                     # 打印内容
                     _show_str = _sp.stdout.readline().decode(shell_encoding).strip()
                     if _show_str != '':
-                        print(_show_str)
+                        self._prompt_obj.prompt_print(_show_str)
 
                     _exit_code = _sp.poll()
                     if _exit_code is not None:
                         # 结束，打印异常日志
                         _show_str = _sp.stdout.read().decode(shell_encoding).strip()
                         if _show_str != '':
-                            print(_show_str)
+                            self._prompt_obj.prompt_print(_show_str)
                         if _exit_code != 0:
                             _show_str = _sp.stderr.read().decode(shell_encoding).strip()
                             if _show_str != '':
-                                print(_show_str)
+                                self._prompt_obj.prompt_print(_show_str)
                         break
                     # 释放一下CPU
                     time.sleep(0.01)
                 except KeyboardInterrupt:
                     # 不允许取消
-                    print(_("Command Executing, can't exit execute job!"))
+                    self._prompt_obj.prompt_print(_("Command Executing, can't exit execute job!"))
         except KeyboardInterrupt:
             # 遇到 Ctrl + C 退出
             pass
@@ -788,9 +819,9 @@ class MediaWikiCmd(CmdBaseFW):
         if _exit_code is not None:
             if _exit_code != 0:
                 # 执行错误，显示异常
-                print('%s : %d' % (_("Command done, exit code"), _exit_code))
+                self._prompt_obj.prompt_print('%s : %d' % (_("Command done, exit code"), _exit_code))
             else:
-                print('%s' % (_("Command execute done"), ))
+                self._prompt_obj.prompt_print('%s' % (_("Command execute done"), ))
 
         return _exit_code
 
@@ -804,7 +835,7 @@ class MediaWikiCmd(CmdBaseFW):
             # 创建目录
             FileTool.create_dir(self._para_dict['pic_dir'])
 
-        print('%s %s' % (_('make pic path'), _('done')))
+        self._prompt_obj.prompt_print('%s %s' % (_('make pic path'), _('done')))
 
     def _append_to_filter_mt(self, path, text):
         """
@@ -814,7 +845,7 @@ class MediaWikiCmd(CmdBaseFW):
         @param {string} text - 要追加的信息
         """
         with open(os.path.join(path, 'filter.mt'), 'a+', encoding='utf-8') as f:
-            f.writelines('\r\n' + text)
+            f.writelines('\n' + text)
 
     def _convert_xls_sheet_to_wiki(self, wb, sheet, conver_para):
         """
@@ -923,7 +954,8 @@ class MediaWikiSite(CmdBaseFW):
             'wiki_site': self._wiki_site_cmd_dealfun,
             'wiki_getpage': self._wiki_getpage_cmd_dealfun,
             'wiki_upload': self._wiki_upload_cmd_dealfun,
-            'wiki_edit': self._wiki_edit_cmd_dealfun
+            'wiki_edit': self._wiki_edit_cmd_dealfun,
+            'wiki_contributions': self._wiki_contributions_cmd_dealfun
         }
         self._mwsite = None
         self._console_global_para = RunTool.get_global_var('CONSOLE_GLOBAL_PARA')
@@ -931,19 +963,21 @@ class MediaWikiSite(CmdBaseFW):
     #############################
     # 实际处理函数
     #############################
-    def _cmd_dealfun(self, message='', cmd='', cmd_para='', **kwargs):
+    def _cmd_dealfun(self, message='', cmd='', cmd_para='', prompt_obj=None, **kwargs):
         """
         通用处理函数，通过cmd区别调用实际的处理函数
 
         @param {string} message='' - prompt提示信息
         @param {string} cmd - 执行的命令key值
         @param {string} cmd_para - 传入的命令参数（命令后的字符串，去掉第一个空格）
+        @param {PromptPlus} prompt_obj=None - 传入调用函数的PromptPlus对象，可以通过该对象的一些方法控制输出显示
         @param {kwargs} - 传入的主进程的初始化kwargs对象
 
-        @return {string|iter_string} - 执行命令完成后要输到屏幕的内容，可以是iter对象（yield返回）
-            注：如果是on_abort和on_exit可以返回CResult对象
+        @returns {CResult} - 命令执行结果，可通过返回错误码10101通知框架退出命令行, 同时也可以通过CResult对象的
+            print_str属性要求框架进行打印处理
         """
         # 获取真实执行的函数
+        self._prompt_obj = prompt_obj  # 传递到对象内部处理
         _real_dealfun = None  # 真实调用的函数
         if 'ignore_case' in kwargs.keys() and kwargs['ignore_case']:
             # 区分大小写
@@ -956,23 +990,28 @@ class MediaWikiSite(CmdBaseFW):
 
         # 执行函数
         if _real_dealfun is not None:
-            return _real_dealfun(message=message, cmd=cmd, cmd_para=cmd_para, **kwargs)
+            return _real_dealfun(message=message, cmd=cmd, cmd_para=cmd_para, prompt_obj=prompt_obj, **kwargs)
         else:
-            return _("'$1' is not support command!", cmd)
+            prompt_obj.prompt_print(_("'$1' is not support command!", cmd))
+            return CResult(code='11404', i18n_msg_paras=(cmd, ))
 
     #############################
     # 实际处理函数
     #############################
-    def _wiki_connect_cmd_dealfun(self, message='', cmd='', cmd_para='', **kwargs):
+    def _wiki_connect_cmd_dealfun(self, message='', cmd='', cmd_para='', prompt_obj=None, **kwargs):
         """
         连接到wiki网站
 
         @param {string} message='' - prompt提示信息
         @param {string} cmd - 执行的命令key值
         @param {string} cmd_para - 传入的命令参数（命令后的字符串，去掉第一个空格）
+        @param {PromptPlus} prompt_obj=None - 传入调用函数的PromptPlus对象，可以通过该对象的一些方法控制输出显示
+        @param {kwargs} - 传入的主进程的初始化kwargs对象
 
-        @return {string} - 执行命令完成后要输到屏幕的内容
+        @returns {CResult} - 命令执行结果，可通过返回错误码10101通知框架退出命令行, 同时也可以通过CResult对象的
+            print_str属性要求框架进行打印处理
         """
+        _ok_result = CResult(code='00000')
         try:
             self._site_para = {
                 'host': '',
@@ -990,7 +1029,8 @@ class MediaWikiSite(CmdBaseFW):
             }
             self._site_para.update(self._cmd_para_to_dict(cmd_para))
             if '{para}1' not in self._site_para.keys():
-                return _('you must give the $1 para!', 'host')
+                prompt_obj.prompt_print(_('you must give the $1 para!', 'host'))
+                return CResult(code='20999')
 
             self._site_para['host'] = self._site_para['{para}1']
 
@@ -998,85 +1038,108 @@ class MediaWikiSite(CmdBaseFW):
             self._connect_to_wikisite()
 
             # 返回提示
-            return '%s: %s://%s\r\n %s:%s  %s:%s' % (
-                _('connect to wikisite'), self._site_para['scheme='],
-                self._site_para['host'], _('auth type'), self._site_para['auth='],
-                _('username'), self._site_para['username=']
+            prompt_obj.prompt_print(
+                '%s: %s://%s\n %s:%s  %s:%s' % (
+                    _('connect to wikisite'), self._site_para['scheme='],
+                    self._site_para['host'], _('auth type'), self._site_para['auth='],
+                    _('username'), self._site_para['username=']
+                )
             )
         except Exception as e:
-            _prin_str = '%s (%s):\r\n%s' % (
+            _prin_str = '%s (%s):\n%s' % (
                 _('execution exception'), str(e), traceback.format_exc()
             )
-            print(_prin_str)
+            prompt_obj.prompt_print(_prin_str)
+            return CResult(code='20999')
 
         # 结束
-        return ''
+        return _ok_result
 
-    def _wiki_reconnect_cmd_dealfun(self, message='', cmd='', cmd_para='', **kwargs):
+    def _wiki_reconnect_cmd_dealfun(self, message='', cmd='', cmd_para='', prompt_obj=None, **kwargs):
         """
         重新连接wiki网站(cookie超时的情况)
 
         @param {string} message='' - prompt提示信息
         @param {string} cmd - 执行的命令key值
         @param {string} cmd_para - 传入的命令参数（命令后的字符串，去掉第一个空格）
+        @param {PromptPlus} prompt_obj=None - 传入调用函数的PromptPlus对象，可以通过该对象的一些方法控制输出显示
+        @param {kwargs} - 传入的主进程的初始化kwargs对象
 
-        @return {string} - 执行命令完成后要输到屏幕的内容
+        @returns {CResult} - 命令执行结果，可通过返回错误码10101通知框架退出命令行, 同时也可以通过CResult对象的
+            print_str属性要求框架进行打印处理
         """
+        _ok_result = CResult(code='00000')
         try:
             if self._mwsite is None:
-                return _('not connect to wiki site yet, please use wikiconnect to connect!')
+                prompt_obj.prompt_print(_('not connect to wiki site yet, please use wikiconnect to connect!'))
+                return CResult(code='20999')
 
             # 连接到wiki网站
             self._connect_to_wikisite()
 
             # 返回提示
-            return '%s: %s://%s\r\n %s:%s  %s:%s' % (
-                _('connect to wikisite'), self._site_para['scheme='],
-                self._site_para['host'], _('auth type'), self._site_para['auth='],
-                _('username'), self._site_para['username=']
+            prompt_obj.prompt_print(
+                '%s: %s://%s\n %s:%s  %s:%s' % (
+                    _('connect to wikisite'), self._site_para['scheme='],
+                    self._site_para['host'], _('auth type'), self._site_para['auth='],
+                    _('username'), self._site_para['username=']
+                )
             )
         except Exception as e:
-            _prin_str = '%s (%s):\r\n%s' % (
+            _prin_str = '%s (%s):\n%s' % (
                 _('execution exception'), str(e), traceback.format_exc()
             )
-            print(_prin_str)
+            prompt_obj.prompt_print(_prin_str)
+            return CResult(code='20999')
 
         # 结束
-        return ''
+        return _ok_result
 
-    def _wiki_site_cmd_dealfun(self, message='', cmd='', cmd_para='', **kwargs):
+    def _wiki_site_cmd_dealfun(self, message='', cmd='', cmd_para='', prompt_obj=None, **kwargs):
         """
         显示当前已连接的wiki网站
 
         @param {string} message='' - prompt提示信息
         @param {string} cmd - 执行的命令key值
         @param {string} cmd_para - 传入的命令参数（命令后的字符串，去掉第一个空格）
+        @param {PromptPlus} prompt_obj=None - 传入调用函数的PromptPlus对象，可以通过该对象的一些方法控制输出显示
+        @param {kwargs} - 传入的主进程的初始化kwargs对象
 
-        @return {string} - 执行命令完成后要输到屏幕的内容
+        @returns {CResult} - 命令执行结果，可通过返回错误码10101通知框架退出命令行, 同时也可以通过CResult对象的
+            print_str属性要求框架进行打印处理
         """
         if self._mwsite is None:
-            return _('not connect to wiki site yet, please use wikiconnect to connect!')
+            prompt_obj.prompt_print(_('not connect to wiki site yet, please use wikiconnect to connect!'))
+            return CResult(code='20999')
 
         # 返回提示
-        return '%s: %s://%s\r\n %s:%s  %s:%s' % (
-            _('connect to wikisite'), self._site_para['scheme='],
-            self._site_para['host'], _('auth type'), self._site_para['auth='],
-            _('username'), self._site_para['username=']
+        prompt_obj.prompt_print(
+            '%s: %s://%s\n %s:%s  %s:%s' % (
+                _('connect to wikisite'), self._site_para['scheme='],
+                self._site_para['host'], _('auth type'), self._site_para['auth='],
+                _('username'), self._site_para['username=']
+            )
         )
+        return CResult(code='00000')
 
-    def _wiki_getpage_cmd_dealfun(self, message='', cmd='', cmd_para='', **kwargs):
+    def _wiki_getpage_cmd_dealfun(self, message='', cmd='', cmd_para='', prompt_obj=None, **kwargs):
         """
         获取指定的wiki页面
 
         @param {string} message='' - prompt提示信息
         @param {string} cmd - 执行的命令key值
         @param {string} cmd_para - 传入的命令参数（命令后的字符串，去掉第一个空格）
+        @param {PromptPlus} prompt_obj=None - 传入调用函数的PromptPlus对象，可以通过该对象的一些方法控制输出显示
+        @param {kwargs} - 传入的主进程的初始化kwargs对象
 
-        @return {string} - 执行命令完成后要输到屏幕的内容
+        @returns {CResult} - 命令执行结果，可通过返回错误码10101通知框架退出命令行, 同时也可以通过CResult对象的
+            print_str属性要求框架进行打印处理
         """
         if self._mwsite is None:
-            return _('not connect to wiki site yet, please use wikiconnect to connect!')
+            prompt_obj.prompt_print(_('not connect to wiki site yet, please use wikiconnect to connect!'))
+            return CResult(code='20999')
 
+        _ok_result = CResult(code='00000')
         try:
             # 处理参数
             self._getpage_para = {
@@ -1086,7 +1149,8 @@ class MediaWikiSite(CmdBaseFW):
             }
             self._getpage_para.update(self._cmd_para_to_dict(cmd_para))
             if '{para}1' not in self._getpage_para.keys():
-                return _('you must give the $1 para!', 'title')
+                prompt_obj.prompt_print(_('you must give the $1 para!', 'title'))
+                return CResult(code='20999')
 
             self._getpage_para['title'] = self._getpage_para['{para}1']
             if self._getpage_para['-output'] == '':
@@ -1096,7 +1160,8 @@ class MediaWikiSite(CmdBaseFW):
             if not os.path.exists(self._getpage_para['-output']):
                 FileTool.create_dir(self._getpage_para['-output'])
             elif os.path.isfile(self._getpage_para['-output']):
-                return _('output path error')
+                prompt_obj.prompt_print(_('output path error'))
+                return CResult(code='20999')
 
             # 设置获取内部链接的层数
             _max_level = 3
@@ -1115,28 +1180,32 @@ class MediaWikiSite(CmdBaseFW):
                 expandtemplates=('-e' in self._getpage_para.keys()),
                 get_templates=('-t' in self._getpage_para.keys())
             )
-
         except Exception as e:
-            _prin_str = '%s (%s):\r\n%s' % (
+            _prin_str = '%s (%s):\n%s' % (
                 _('execution exception'), str(e), traceback.format_exc()
             )
-            print(_prin_str)
+            prompt_obj.prompt_print(_prin_str)
+            return CResult(code='20999')
 
         # 结束
-        return ''
+        return _ok_result
 
-    def _wiki_upload_cmd_dealfun(self, message='', cmd='', cmd_para='', **kwargs):
+    def _wiki_upload_cmd_dealfun(self, message='', cmd='', cmd_para='', prompt_obj=None, **kwargs):
         """
         上传文件到wiki网站
 
         @param {string} message='' - prompt提示信息
         @param {string} cmd - 执行的命令key值
         @param {string} cmd_para - 传入的命令参数（命令后的字符串，去掉第一个空格）
+        @param {PromptPlus} prompt_obj=None - 传入调用函数的PromptPlus对象，可以通过该对象的一些方法控制输出显示
+        @param {kwargs} - 传入的主进程的初始化kwargs对象
 
-        @return {string} - 执行命令完成后要输到屏幕的内容
+        @returns {CResult} - 命令执行结果，可通过返回错误码10101通知框架退出命令行, 同时也可以通过CResult对象的
+            print_str属性要求框架进行打印处理
         """
         if self._mwsite is None:
-            return _('not connect to wiki site yet, please use wikiconnect to connect!')
+            prompt_obj.prompt_print(_('not connect to wiki site yet, please use wikiconnect to connect!'))
+            return CResult(code='20999')
 
         try:
             # 处理参数
@@ -1183,26 +1252,31 @@ class MediaWikiSite(CmdBaseFW):
                 ignore=('-I' in self._upload_para.keys())
             )
         except Exception as e:
-            _prin_str = '%s (%s):\r\n%s' % (
+            _prin_str = '%s (%s):\n%s' % (
                 _('execution exception'), str(e), traceback.format_exc()
             )
-            print(_prin_str)
+            prompt_obj.prompt_print(_prin_str)
+            return CResult(code='20999')
 
         # 结束
-        return ''
+        return CResult(code='20999')
 
-    def _wiki_edit_cmd_dealfun(self, message='', cmd='', cmd_para='', **kwargs):
+    def _wiki_edit_cmd_dealfun(self, message='', cmd='', cmd_para='', prompt_obj=None, **kwargs):
         """
         编辑页面并提交wiki网站
 
         @param {string} message='' - prompt提示信息
         @param {string} cmd - 执行的命令key值
         @param {string} cmd_para - 传入的命令参数（命令后的字符串，去掉第一个空格）
+        @param {PromptPlus} prompt_obj=None - 传入调用函数的PromptPlus对象，可以通过该对象的一些方法控制输出显示
+        @param {kwargs} - 传入的主进程的初始化kwargs对象
 
-        @return {string} - 执行命令完成后要输到屏幕的内容
+        @returns {CResult} - 命令执行结果，可通过返回错误码10101通知框架退出命令行, 同时也可以通过CResult对象的
+            print_str属性要求框架进行打印处理
         """
         if self._mwsite is None:
-            return _('not connect to wiki site yet, please use wikiconnect to connect!')
+            prompt_obj.prompt_print(_('not connect to wiki site yet, please use wikiconnect to connect!'))
+            return CResult(code='20999')
 
         try:
             # 处理参数
@@ -1257,13 +1331,292 @@ class MediaWikiSite(CmdBaseFW):
             )
 
         except Exception as e:
-            _prin_str = '%s (%s):\r\n%s' % (
+            _prin_str = '%s (%s):\n%s' % (
                 _('execution exception'), str(e), traceback.format_exc()
             )
-            print(_prin_str)
+            prompt_obj.prompt_print(_prin_str)
+            return CResult(code='20999')
 
         # 结束
-        return ''
+        return CResult(code='00000')
+
+    def _wiki_contributions_cmd_dealfun(self, message='', cmd='', cmd_para='', prompt_obj=None, **kwargs):
+        """
+        生成网站贡献排名页面
+
+        @param {string} message='' - prompt提示信息
+        @param {string} cmd - 执行的命令key值
+        @param {string} cmd_para - 传入的命令参数（命令后的字符串，去掉第一个空格）
+        @param {PromptPlus} prompt_obj=None - 传入调用函数的PromptPlus对象，可以通过该对象的一些方法控制输出显示
+        @param {kwargs} - 传入的主进程的初始化kwargs对象
+
+        @returns {CResult} - 命令执行结果，可通过返回错误码10101通知框架退出命令行, 同时也可以通过CResult对象的
+            print_str属性要求框架进行打印处理
+        """
+        if self._mwsite is None:
+            prompt_obj.prompt_print(_('not connect to wiki site yet, please use wikiconnect to connect!'))
+            return CResult(code='20999')
+
+        try:
+            # 处理参数
+            _contributions_para = {
+                '-para_file': '',
+                '-out': '',
+                '-name': '',
+                '-add_category': '',
+                '-summary': ''
+            }
+            _contributions_para.update(self._cmd_para_to_dict(cmd_para))
+
+            if _contributions_para['-out'] == '':
+                # 如果不传参数默认使用工作路径
+                _contributions_para['-out'] = self._console_global_para['work_path']
+            else:
+                if not os.path.exists(_contributions_para['-out']):
+                    # 创建对应目录
+                    FileTool.create_dir(_contributions_para['-out'])
+                _contributions_para['-out'] = os.path.realpath(_contributions_para['-out'])
+
+            if _contributions_para['-para_file'] == '':
+                _contributions_para['-para_file'] = os.path.join(
+                    _contributions_para['-out'], 'contributions.json'
+                )
+
+            _para_json = StringTool.json_to_object(
+                FileTool.get_file_text(_contributions_para['-para_file'], encoding=None)
+            )
+
+            if _contributions_para['-name'] == '':
+                _contributions_para['-name'] = _('Contribution_ranking')
+
+            # 尝试获取所有页面
+            _now = datetime.datetime.now()
+            _now_str = _now.strftime("%Y-%m-%d")
+            _last_month = (_now - datetime.timedelta(days=30)).strftime("%Y-%m-%d")
+            _last_week = (_now - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+
+            # 机构发布内容排名
+            prompt_obj.prompt_print(_('get team publish ranking data') + '....')
+            _namespace_ranking_para = _para_json[self._site_para['host']]['namespace_ranking']
+            if 'data' not in _namespace_ranking_para.keys():
+                _namespace_ranking_para['data'] = dict()
+            else:
+                _namespace_ranking_para['data'].clear()
+
+            for _ns in _namespace_ranking_para['ranking_ns']:
+                self._prompt_obj.prompt_print(
+                    _('deal with [$1]', _ns), end=': '
+                )
+                _count_dict = self._get_ns_page_count(
+                    _namespace_ranking_para['ns_dict'][_ns], _last_month, _last_week
+                )
+                if _ns in _namespace_ranking_para['level_dict']:
+                    for _sub_ns in _namespace_ranking_para['level_dict'][_ns]:
+                        _sub_count_dict = self._get_ns_page_count(
+                            _namespace_ranking_para['ns_dict'][_sub_ns], _last_month, _last_week
+                        )
+                        _count_dict['count'] += _sub_count_dict['count']
+                        _count_dict['last_month_add'] += _sub_count_dict['last_month_add']
+                        _count_dict['last_month_change'] += _sub_count_dict['last_month_change']
+                        _count_dict['last_week_add'] += _sub_count_dict['last_week_add']
+                        _count_dict['last_week_change'] += _sub_count_dict['last_week_change']
+                # 增加排序字段
+                _count_dict['order'] = _count_dict['count'] * 100 + (_count_dict['last_month_add'] + _count_dict['last_month_change']) * 10 + (_count_dict['last_week_add'] + _count_dict['last_week_change'])
+                # 添加到文件的字典中
+                _namespace_ranking_para['data'][_ns] = _count_dict
+                self._prompt_obj.prompt_print(_('done'))
+
+            # 进行字典排序
+            _namespace_ranking_para['count day'] = _now_str
+            _namespace_ranking_para['sorted_data'] = sorted(
+                _namespace_ranking_para['data'].items(),
+                key=lambda d: d[1].get('order', 0),
+                reverse=True
+            )
+
+            # 个人贡献排名
+            prompt_obj.prompt_print(_('get person publish ranking data') + '....')
+            _person_ranking_para = _para_json[self._site_para['host']]['person_ranking']
+            if 'data' not in _person_ranking_para.keys():
+                _person_ranking_para['data'] = dict()
+            else:
+                _person_ranking_para['data'].clear()
+            # 执行处理
+            _person_dict = self._get_person_ranking_data(_person_ranking_para, _last_month, _last_week)
+
+            # 添加到字典中
+            _person_ranking_para['count day'] = _now_str
+            _person_ranking_para['data'] = _person_dict
+
+            # 排序
+            _person_ranking_para['sorted_data_total'] = sorted(
+                _person_ranking_para['data'].items(),
+                key=lambda d: d[1].get('total_ranking_scroe', 0),
+                reverse=True
+            )
+            _person_ranking_para['sorted_data_month'] = sorted(
+                _person_ranking_para['data'].items(),
+                key=lambda d: d[1].get('last_month_ranking_scroe', 0),
+                reverse=True
+            )
+            _person_ranking_para['sorted_data_week'] = sorted(
+                _person_ranking_para['data'].items(),
+                key=lambda d: d[1].get('last_week_ranking_scroe', 0),
+                reverse=True
+            )
+
+            # 写回文件中
+            with open(
+                _contributions_para['-para_file'], "w", encoding='utf-8'
+            ) as f:
+                f.write(json.dumps(_para_json, ensure_ascii=False, indent=2))
+
+            # 生成页面文件
+            prompt_obj.prompt_print(_('create ranking page') + '....', end=' ')
+
+            # 团队贡献排行
+            _wiki_text = '%s: %s\n\n\n=%s=\n%s\n{| class="wikitable"\n|+%s\n!%s\n' % (
+                _('statistical date'), _now_str,
+                '%s %s' % (_('team'), _('contribution ranking')),
+                _namespace_ranking_para['description'],
+                '%s %s' % (_('team'), _('contribution ranking')),
+                '\n!'.join(
+                    [
+                        _('rank'), _('team'), _('publish page count'), _('last month add'),
+                        _('last month change'), _('last week add'), _('last week change'),
+                    ])
+            )
+            _i = 1
+            for _row_data in _namespace_ranking_para['sorted_data']:
+                _wiki_text = '%s|-\n|%s\n' % (
+                    _wiki_text, '\n|'.join([
+                        str(_i), _row_data[0], str(_row_data[1]['count']),
+                        str(_row_data[1]['last_month_add']), str(_row_data[1]['last_month_change']),
+                        str(_row_data[1]['last_week_add']), str(_row_data[1]['last_week_change']),
+                    ])
+                )
+                _i += 1
+
+            _wiki_text = '%s%s' % (_wiki_text, '|}\n')
+
+            # 总排行
+            _wiki_text = '%s\n\n=%s=\n==%s==\n%s\n{| class="wikitable"\n|+%s\n!%s\n' % (
+                _wiki_text, '%s %s' % (_('person'), _('contribution ranking')),
+                '%s %s' % (_('total'), _('contribution ranking')),
+                _person_ranking_para['description_total'],
+                '%s %s' % (_('total'), _('contribution ranking')),
+                '\n!'.join([
+                    _('rank'), _('user'), _('add page count'), _('change page count'), _('ranking scroe')
+                ])
+            )
+
+            _i = 1
+            for _row_data in _person_ranking_para['sorted_data_total']:
+                if _i < _person_ranking_para['top'] and _row_data[1]['total_ranking_scroe'] > 0:
+                    _wiki_text = '%s|-\n|%s\n' % (
+                        _wiki_text, '\n|'.join([
+                            str(_i), _row_data[0], str(_row_data[1]['total_add']),
+                            str(_row_data[1]['total_change']),
+                            str(round(_row_data[1]['total_ranking_scroe'], 2))
+                        ])
+                    )
+                else:
+                    break
+                _i += 1
+
+            _wiki_text = '%s%s' % (_wiki_text, '|}\n')
+
+            # 月榜
+            _wiki_text = '%s\n\n==%s==\n%s\n{| class="wikitable"\n|+%s\n!%s\n' % (
+                _wiki_text,
+                '%s %s' % (_('last month'), _('contribution ranking')),
+                _person_ranking_para['description_last_month'],
+                '%s %s' % (_('last month'), _('contribution ranking')),
+                '\n!'.join([
+                    _('rank'), _('user'), _('add page count'), _('change page count'), _('ranking scroe')
+                ])
+            )
+
+            _i = 1
+            for _row_data in _person_ranking_para['sorted_data_month']:
+                if _i < _person_ranking_para['top'] and _row_data[1]['last_month_ranking_scroe'] > 0:
+                    _wiki_text = '%s|-\n|%s\n' % (
+                        _wiki_text, '\n|'.join([
+                            str(_i), _row_data[0], str(_row_data[1]['last_month_add']),
+                            str(_row_data[1]['last_month_change']),
+                            str(round(_row_data[1]['last_month_ranking_scroe'], 2))
+                        ])
+                    )
+                else:
+                    break
+                _i += 1
+
+            _wiki_text = '%s%s' % (_wiki_text, '|}\n')
+
+            # 周榜
+            _wiki_text = '%s\n\n==%s==\n%s\n{| class="wikitable"\n|+%s\n!%s\n' % (
+                _wiki_text,
+                '%s %s' % (_('last week'), _('contribution ranking')),
+                _person_ranking_para['description_last_week'],
+                '%s %s' % (_('last week'), _('contribution ranking')),
+                '\n!'.join([
+                    _('rank'), _('user'), _('add page count'), _('change page count'), _('ranking scroe')
+                ])
+            )
+
+            _i = 1
+            for _row_data in _person_ranking_para['sorted_data_week']:
+                if _i < _person_ranking_para['top'] and _row_data[1]['last_week_ranking_scroe'] > 0:
+                    _wiki_text = '%s|-\n|%s\n' % (
+                        _wiki_text, '\n|'.join([
+                            str(_i), _row_data[0], str(_row_data[1]['last_week_add']),
+                            str(_row_data[1]['last_week_change']),
+                            str(round(_row_data[1]['last_week_ranking_scroe'], 2))
+                        ])
+                    )
+                else:
+                    break
+                _i += 1
+
+            _wiki_text = '%s%s' % (_wiki_text, '|}\n')
+
+            _before_text = ''
+            if '-add_category' in _contributions_para.keys():
+                # 增加分类信息
+                _categorys = _contributions_para['-add_category'].split(',')
+                for _category in _categorys:
+                    if _category.strip() != '':
+                        _before_text += '[[category:%s]]\n' % _category.strip()
+
+            # 写入文件
+            with open(
+                os.path.join(_contributions_para['-out'], _contributions_para['-name'] + '.txt'),
+                "w", encoding='utf-8'
+            ) as f:
+                f.write('%s%s' % (_before_text, _wiki_text))
+
+            # 增加filter.mt信息
+            if '-add_filter' in _contributions_para.keys():
+                self._append_to_filter_mt(
+                    _contributions_para['-out'],
+                    '%s|%s|%s|%s' % (
+                        _contributions_para['-name'] + '.txt',
+                        _contributions_para['-name'].replace('{ns}', ':').replace('{sub}', '/'),
+                        _contributions_para['-summary'], 'true'
+                    )
+                )
+
+            # 完成处理
+            prompt_obj.prompt_print(_('done'))
+        except Exception as e:
+            _prin_str = '%s (%s):\n%s' % (
+                _('execution exception'), str(e), traceback.format_exc()
+            )
+            prompt_obj.prompt_print(_prin_str)
+            return CResult(code='20999')
+
+        # 结束
+        return CResult(code='00000')
 
     #############################
     # 内部函数
@@ -1319,14 +1672,14 @@ class MediaWikiSite(CmdBaseFW):
         @param {bool} get_templates=False - 是否获取页面包含的模板
         """
         if title in self._get_page_objs.keys():
-            print(_('page [$1] has been processed', title))
+            self._prompt_obj.prompt_print(_('page [$1] has been processed', title))
             return
         self._get_page_objs[title] = ''  # 加入到已处理列表
 
-        print('%s: %s =====================>' % (_('getting page'), title))
+        self._prompt_obj.prompt_print('%s: %s =====================>' % (_('getting page'), title))
         _page = self._mwsite.pages[title]
         if not _page.exists:
-            print(_('get wiki page error: page [$1] not exists!', title))
+            self._prompt_obj.prompt_print(_('get wiki page error: page [$1] not exists!', title))
             return
 
         # 获取页面内容
@@ -1338,12 +1691,12 @@ class MediaWikiSite(CmdBaseFW):
         with open(os.path.join(output, _filename), "w", encoding='utf-8') as f:
             f.write(_page.text(expandtemplates=expandtemplates))
 
-        print('%s %s' % (_('get page [$1] text', title), _('done')))
+        self._prompt_obj.prompt_print('%s %s' % (_('get page [$1] text', title), _('done')))
 
         _filename_no_ext = FileTool.get_file_name_no_ext(_filename)
         # 判断是否下载页面包含的文件
         if down_file:
-            print('\r\n%s:' % (_('download files in page [$1]', title)))
+            self._prompt_obj.prompt_print('\n%s:' % (_('download files in page [$1]', title)))
             # 创建目录
             _file_dir = os.path.join(output, _filename_no_ext + '_copy_pic')
             if os.path.exists(_file_dir):
@@ -1353,7 +1706,7 @@ class MediaWikiSite(CmdBaseFW):
             # 下载文件
             for _image in _page.images():
                 if _image.name in self._get_page_objs.keys():
-                    print(_('resource [$1] has been processed', _image.name))
+                    self._prompt_obj.prompt_print(_('resource [$1] has been processed', _image.name))
                     continue
                 self._get_page_objs[_image.name] = ''  # 加入到已处理列表
 
@@ -1363,14 +1716,14 @@ class MediaWikiSite(CmdBaseFW):
                     _image_name = _image_name[_nameindex + 1:]
                 with open(os.path.join(_file_dir, _image_name), 'wb') as fd:
                     _image.download(fd)
-                print('%s %s' % (_('download file [$1]', _image_name), _('done')))
+                self._prompt_obj.prompt_print('%s %s' % (_('download file [$1]', _image_name), _('done')))
 
         # 判断是否下载内部链接页面
         if get_links and current_level < max_level:
-            print('\r\n%s:\r\n' % (_('get link_pages on page [$1]', title)))
+            self._prompt_obj.prompt_print('\n%s:\n' % (_('get link_pages on page [$1]', title)))
             for _link in _page.links():
                 if _link.name in self._get_page_objs.keys():
-                    print(_('resource [$1] has been processed', _link.name))
+                    self._prompt_obj.prompt_print(_('resource [$1] has been processed', _link.name))
                     continue
 
                 self._get_wiki_page(
@@ -1378,14 +1731,14 @@ class MediaWikiSite(CmdBaseFW):
                     max_level=max_level, current_level=current_level+1,
                     expandtemplates=expandtemplates, get_templates=get_templates
                 )
-                print('\r\n%s %s' % (_('get link_page [$1]', _link.name), _('done')))
+                self._prompt_obj.prompt_print('\n%s %s' % (_('get link_page [$1]', _link.name), _('done')))
 
         # 判断是否下载页面使用到的所有模板
         if get_templates:
-            print('\r\n%s:\r\n' % (_('get template_pages on page [$1]', title)))
+            self._prompt_obj.prompt_print('\n%s:\n' % (_('get template_pages on page [$1]', title)))
             for _template in _page.templates():
                 if _template.name in self._get_page_objs.keys():
-                    print(_('resource [$1] has been processed', _template.name))
+                    self._prompt_obj.prompt_print(_('resource [$1] has been processed', _template.name))
                     continue
 
                 self._get_wiki_page(
@@ -1394,7 +1747,7 @@ class MediaWikiSite(CmdBaseFW):
                     expandtemplates=False,
                     get_templates=True
                 )
-                print('\r\n%s %s' % (_('get template_page [$1]', _template.name), _('done')))
+                self._prompt_obj.prompt_print('\n%s %s' % (_('get template_page [$1]', _template.name), _('done')))
 
     def _upload_files(self, input, file_list, rewrite=False, desc='', ignore=False):
         """
@@ -1406,7 +1759,7 @@ class MediaWikiSite(CmdBaseFW):
         @param {string} desc='' - 通用描述
         @param {bool} ignore=False - 如果为True时忽略警告强制执行
         """
-        print('%s: %s =====================>' % (_('uploading files'), input))
+        self._prompt_obj.prompt_print('%s: %s =====================>' % (_('uploading files'), input))
         for _file in file_list:
             # 处理基本信息
             _file_info = _file.split('|')
@@ -1428,13 +1781,13 @@ class MediaWikiSite(CmdBaseFW):
 
             # 判断文件是否已处理
             if _filename in self._upload_objs.keys():
-                print(_('resource [$1] has been processed', _filename))
+                self._prompt_obj.prompt_print(_('resource [$1] has been processed', _filename))
                 continue
             self._upload_objs[_filename] = ''
 
             _image = self._mwsite.images[_upload_name]
             if _image.exists and not rewrite:
-                print(_('filename [$1] has been in wiki site!', _upload_name))
+                self._prompt_obj.prompt_print(_('filename [$1] has been in wiki site!', _upload_name))
                 continue
 
             # 处理上传操作
@@ -1444,19 +1797,19 @@ class MediaWikiSite(CmdBaseFW):
                     _upload_name, _desc, ignore=ignore
                 )
             except Exception as e:
-                _prin_str = '%s %s (%s):\r\n%s' % (
+                _prin_str = '%s %s (%s):\n%s' % (
                     _('upload file [$1] > [$2]', _filename, _upload_name),
                     _('fail'), str(e), traceback.format_exc()
                 )
-                print(_prin_str)
+                self._prompt_obj.prompt_print(_prin_str)
                 continue
 
             if ('result' in _result.keys() and _result['result'] == 'Success') or ('upload' in _result.keys() and 'result' in _result['upload'].keys() and _result['upload']['result'] == 'Success'):
-                print('%s %s' % (_('upload file [$1] > [$2]', _filename, _upload_name), _('done')))
+                self._prompt_obj.prompt_print('%s %s' % (_('upload file [$1] > [$2]', _filename, _upload_name), _('done')))
                 if 'warnings' in _result.keys():
-                    print('%s:\r\n%s\r\n' % (_('upload [$1] with warnings', _filename), _result['warnings']))
+                    self._prompt_obj.prompt_print('%s:\n%s\n' % (_('upload [$1] with warnings', _filename), _result['warnings']))
             else:
-                print('%s %s:\r\n%s\r\n' % (
+                self._prompt_obj.prompt_print('%s %s:\n%s\n' % (
                     _('upload file [$1] > [$2]', _filename, _upload_name), _('fail'),
                     str(_result)
                 ))
@@ -1476,7 +1829,7 @@ class MediaWikiSite(CmdBaseFW):
         @param {bool} file_ignore=False - 如果为True时忽略警告强制执行
         @param {string} file_desc='' - 文件通用描述
         """
-        print('%s: %s =====================>' % (_('editing pages'), input))
+        self._prompt_obj.prompt_print('%s: %s =====================>' % (_('editing pages'), input))
         for _file in file_list:
             # 处理基本信息
             _file_info = _file.split('|')
@@ -1507,17 +1860,17 @@ class MediaWikiSite(CmdBaseFW):
 
             # 判断文件是否已处理
             if _filename in self._edit_objs.keys():
-                print(_('page [$1] has been processed', _filename))
+                self._prompt_obj.prompt_print(_('page [$1] has been processed', _filename))
                 continue
             self._edit_objs[_filename] = ''
 
             _page = self._mwsite.pages[_title]
             if _page.exists and not rewrite:
-                print(_('page [$1] has been in wiki site!', _title))
+                self._prompt_obj.prompt_print(_('page [$1] has been in wiki site!', _title))
                 continue
 
             # 判断是否要上传附件(先上传的目的是避免页面打开看不到图片，需要手工保存一次才能看到)
-            print(_('edit page [$1]:  upload files', _title))
+            self._prompt_obj.prompt_print(_('edit page [$1]:  upload files', _title))
             _pic_path = os.path.join(input, FileTool.get_file_name_no_ext(_filename) + '_copy_pic')
             if _upload_files and os.path.exists(_pic_path) and os.path.isdir(_pic_path):
                 # 满足上传附件的条件，模拟执行命令上传
@@ -1536,22 +1889,174 @@ class MediaWikiSite(CmdBaseFW):
                 )
                 _result = _page.save(_text, _summary)
             except Exception as e:
-                _prin_str = '%s %s (%s):\r\n%s' % (
+                _prin_str = '%s %s (%s):\n%s' % (
                     _('edit page [$1] > [$2]', _filename, _title), _('fail'), str(e), traceback.format_exc()
                 )
-                print(_prin_str)
+                self._prompt_obj.prompt_print(_prin_str)
                 continue
 
             if 'result' in _result.keys() and _result['result'] == 'Success':
-                print('%s %s' % (_('edit page [$1] > [$2]', _filename, _title), _('done')))
+                self._prompt_obj.prompt_print('%s %s' % (_('edit page [$1] > [$2]', _filename, _title), _('done')))
                 if 'warnings' in _result.keys():
-                    print('%s:\r\n%s\r\n' % (_('edit page [$1] with warnings', _filename), _result['warnings']))
+                    self._prompt_obj.prompt_print('%s:\n%s\n' % (_('edit page [$1] with warnings', _filename), _result['warnings']))
             else:
-                print('%s %s:\r\n%s\r\n' % (
+                self._prompt_obj.prompt_print('%s %s:\n%s\n' % (
                     _('edit page [$1] > [$2]', _filename, _title), _('fail'),
                     str(_result)
                 ))
                 continue
+
+    def _get_ns_page_count(self, ns, last_month, last_week):
+        """
+        获取命名空间的页面统计
+
+        @param {int} ns - 命名空间编号
+        @param {string} last_month - 上一个月(30天)的日期时间，格式为yyyy-mm-dd
+        @param {string} last_week - 上一个星期(7天)的日期时间，格式为yyyy-mm-dd
+
+        @return {dict} - 统计信息
+            count : 总页面数
+            last_month_add : 一个月(30天)内新增
+            last_month_change : 一个月(30天)内修改
+            last_week_add : 一个星期内新增
+            last_week_change : 一个星期内修改
+        """
+        _dict = {
+            'count': 0,
+            'last_month_add': 0,
+            'last_month_change': 0,
+            'last_week_add': 0,
+            'last_week_change': 0
+        }
+
+        _all_pages = self._mwsite.allpages(namespace=str(ns), filterredir='nonredirects', limit=5000)
+        for _page in _all_pages:
+            self._prompt_obj.prompt_print('.', end='', flush=True)
+            _dict['count'] += 1
+            _has_week_revi = False
+            # 按周计算
+            _revisions = _page.revisions(start='%sT00:00:01Z' % last_week, dir='newer', limit=2)
+            for _revi in _revisions:
+                if _revi['parentid'] == 0:
+                    # 是新增
+                    _dict['last_month_add'] += 1
+                    _dict['last_week_add'] += 1
+                else:
+                    # 是修改
+                    _dict['last_month_change'] += 1
+                    _dict['last_week_change'] += 1
+                # 标识按周已经有数据
+                _has_week_revi = True
+                # 只要判断第一条记录就可以了
+                break
+
+            if _has_week_revi:
+                # 按周处理过，则无需再判断月
+                continue
+
+            # 按月计算
+            _revisions = _page.revisions(start='%sT00:00:01Z' % last_month, dir='newer', limit=2)
+            for _revi in _revisions:
+                if _revi['parentid'] == 0:
+                    # 是新增
+                    _dict['last_month_add'] += 1
+                else:
+                    # 是修改
+                    _dict['last_month_change'] += 1
+
+                # 只要判断第一条记录就可以了
+                break
+
+        return _dict
+
+    def _get_person_ranking_data(self, person_ranking_para, last_month, last_week):
+        """
+        <description>
+
+        @param {<type>} person_ranking_para - <description>
+        @param {<type>} last_month - <description>
+        @param {<type>} last_week - <description>
+        """
+        _dict = dict()
+        _ns_list = None
+        if len(person_ranking_para['ns_list']) > 0:
+            # 命名空间清单: 0-Main,2-用户,6-文件,8-MediaWiki,10-模板,12-帮助
+            _ns_list = '|'.join(person_ranking_para['ns_list'])
+        _dt_last_month = datetime.datetime.strptime(last_month, '%Y-%m-%d')
+        _dt_last_week = datetime.datetime.strptime(last_week, '%Y-%m-%d')
+
+        # 列出有编辑过的用户
+        _all_user = self._mwsite.allusers(limit=5000, witheditsonly=True)
+        _user_list = [[_user['name']] for _user in _all_user]
+        with self._prompt_obj.get_process_bar() as pb:
+            for _user_info in pb(_user_list, total=len(_user_list), label=_('deal with [$1]', _('user'))):
+                _user = _user_info[0]
+                if _user in person_ranking_para['black_list']:
+                    # 黑名单用户，不处理
+                    continue
+
+                _dict[_user] = {
+                    'total_add': 0,
+                    'total_change': 0,
+                    'total_ranking_scroe': 0,
+                    'last_month_add': 0,
+                    'last_month_change': 0,
+                    'last_month_ranking_scroe': 0,
+                    'last_week_add': 0,
+                    'last_week_change': 0,
+                    'last_week_ranking_scroe': 0
+                }
+
+                # 所有的新增贡献
+                _contrib = self._mwsite.usercontributions(
+                    [_user, ],
+                    namespace=_ns_list,
+                    limit=50000,
+                    show="new",
+                    prop='ids|timestamp'
+                )
+                for _page in _contrib:
+                    _dict[_user]['total_add'] += 1
+                    _dict[_user]['total_ranking_scroe'] += person_ranking_para['add_score']
+                    _dt = datetime.datetime.fromtimestamp(time.mktime(_page['timestamp']))
+                    if _dt > _dt_last_month:
+                        _dict[_user]['last_month_add'] += 1
+                        _dict[_user]['last_month_ranking_scroe'] += person_ranking_para['add_score']
+                    if _dt > _dt_last_week:
+                        _dict[_user]['last_week_add'] += 1
+                        _dict[_user]['last_week_ranking_scroe'] += person_ranking_para['add_score']
+
+                # 所有的修改贡献
+                _contrib = self._mwsite.usercontributions(
+                    [_user, ],
+                    namespace=_ns_list,
+                    limit=50000,
+                    show="!new|!minor",
+                    prop='ids|timestamp'
+                )
+                for _page in _contrib:
+                    _dict[_user]['total_change'] += 1
+                    _dict[_user]['total_ranking_scroe'] += person_ranking_para['change_score']
+                    _dt = datetime.datetime.fromtimestamp(time.mktime(_page['timestamp']))
+                    if _dt > _dt_last_month:
+                        _dict[_user]['last_month_change'] += 1
+                        _dict[_user]['last_month_ranking_scroe'] += person_ranking_para['change_score']
+                    if _dt > _dt_last_week:
+                        _dict[_user]['last_week_change'] += 1
+                        _dict[_user]['last_week_ranking_scroe'] += person_ranking_para['change_score']
+
+        # 返回结果数组
+        return _dict
+
+    def _append_to_filter_mt(self, path, text):
+        """
+        把信息添加到filter.mt文件中
+
+        @param {string} path - 文件所在路径
+        @param {string} text - 要追加的信息
+        """
+        with open(os.path.join(path, 'filter.mt'), 'a+', encoding='utf-8') as f:
+            f.writelines('\n' + text)
 
 
 if __name__ == '__main__':

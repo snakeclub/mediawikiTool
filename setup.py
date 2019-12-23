@@ -21,16 +21,17 @@ SHORT_DESCRIPTION = """
 A command line tool for mediawiki file format covert and so on.""".strip()
 
 DEPENDENCIES = [
-    'HiveNetLib>=0.7.4',
+    'HiveNetLib>=0.7.5',
     'mwclient',
-    'xlrd'
+    'xlrd',
+    'prompt-toolkit>=2.0.0'
 ]
 
 # DEPENDENCIES = []
 
 TEST_DEPENDENCIES = []
 
-VERSION = '0.7.0'
+VERSION = '0.8.0'
 URL = 'https://github.com/snakeclub/mediawikiTool'
 
 setup(

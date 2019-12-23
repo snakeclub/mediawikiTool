@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="utf-8"?>
 <console>
     <!--
         控制台配置
@@ -27,7 +26,7 @@
     -->
     <name>mediawikiTool</name>
     <shell_cmd_name>wikitool</shell_cmd_name>
-    <version>0.7.0</version>
+    <version>0.8.0</version>
     <language>en</language>
     <i18n/>
     <shell_encoding>GBK</shell_encoding>
@@ -478,12 +477,12 @@
                         "    -in : input path, If not specified to represent on the current working directory",
                         "    -out : the MediaWiki file output path, If not specified to represent output on the current working directory",
                         "    -stdpic : Set this parameter to automatically rename the pictures in order;Otherwise it will be named after the original file name",
-                        "    -add_file_link : 是否在文件头添加原文件链接",
-                        "        注: 原文件将复制到输出目录的'source_file_list'中, 并加入filter.mt文件",
-                        "    -add_category : 在文件头添加分类信息, 参数后面多个分类使用逗号','分隔",
-                        "    -add_comments : 指定是否在文件结尾增加评论框",
-                        "    -add_filter : 指定是否添加到上传的filter.mt文件中(文件所在目录)",
-                        "    -summary : filter.mt文件中的摘要信息",
+                        "    -add_file_link : set this parameter to add source file link on the begining of wiki page",
+                        "        Note: source file will copy to the 'source_file_list' path of the output paht, and add to the filter.mt file",
+                        "    -add_category : add category at the begining of page, use ',' to split if you need add more category",
+                        "    -add_comments : set this parameter to comments support at the end of page",
+                        "    -add_filter : set this parameter to add the page info to filter.mt file to upload list (output path)",
+                        "    -summary : the edit summary to add to filter.mt file",
                         "",
                         "demo: filestowiki",
                         ""
@@ -798,6 +797,89 @@
                         "    -FD : 上传图片附件的通用描述, 例如 '-FD 描述'",
                         "",
                         "示例: wiki_edit -input d:\\test\\",
+                        ""
+                ]
+            }
+            </help>
+        </cmd>
+        <cmd>
+            <command>wiki_contributions</command>
+            <module_name>mediawikiTool.lib.mediawiki_cmd</module_name>
+            <class_name>MediaWikiSite</class_name>
+            <extend_path/>
+            <init_para/>
+            <cmd_para>{
+                "long_para": {
+                    "para_file": [],
+                    "out": [],
+                    "name": [],
+                    "add_category": [],
+                    "add_filter": [],
+                    "summary": []
+                }
+            }
+            </cmd_para>
+            <help>{
+                "en": [
+                        "create wiki site contribute ranking page",
+                        "",
+                        "wiki_contributions [-para_file=contributions.json] [-out path] [-name filename]",
+                        "    -para_file : para file, if not specified then use the contributions.json file in the output path",
+                        "    -out : output path",
+                        "    -name : output file name (without extension)",
+                        "    -add_category : add category at the begining of page, use ',' to split if you need add more category",
+                        "    -add_filter : set this parameter to add the page info to filter.mt file to upload list (output path)",
+                        "    -summary : the edit summary to add to filter.mt file",
+                        "",
+                        "demo: wiki_contributions",
+                        "",
+                        "contributions.json description (at the JSON dictionary level, refer to the example in the demo directory in the library package):",
+                        "  host - the wiki site, You can set the contribution generation parameters for multiple sites, which will match the sites you have logged in",
+                        "    namespace_ranking - namespace ranking para, as team ranking",
+                        "      ranking_ns - the list of namespace which ranking, like: [\"develop center\", \"operation center\"]",
+                        "      level_dict - Namespace hierarchy dictionary, the key is parent namespace name, the value is child namespace name",
+                        "      ns_dict - the dict of name and id relationship for namespace, the key is namespace name, the value is id of namespace (int)",
+                        "      description - Namespace contribution ranking description",
+                        "    person_ranking - person ranking para",
+                        "      top - int, set how many person show in ranking",
+                        "      add_score - float, the contribution score of add page",
+                        "      change_score - float, the contribution score of change page",
+                        "      black_list - black list, the user name that not join the ranking, like: [\"Admin\"]",
+                        "      ns_list - the namespace id list with the ranking, like: [\"0\", \"12\", \"3000\"]",
+                        "      description_total - total contribution ranking description",
+                        "      description_last_month - last month contribution ranking description",
+                        "      description_last_week - last week contribution ranking description",
+                        ""
+                ],
+                "zh_cn": [
+                        "生成网站贡献排名页面",
+                        "",
+                        "wiki_contributions [-para_file=contributions.json] [-out path] [-name filename]",
+                        "    -para_file : 统计参数文件, 如果不传默认是输出目录下的contributions.json",
+                        "    -out : 输出目录",
+                        "    -name : 文件名(不含扩展名)",
+                        "    -add_category : 在文件头添加分类信息, 参数后面多个分类使用逗号','分隔",
+                        "    -add_filter : 指定是否添加到上传的filter.mt文件中(文件所在目录)",
+                        "    -summary : filter.mt文件中的摘要信息",
+                        "",
+                        "示例: wiki_contributions",
+                        "",
+                        "contributions.json文件说明(按JSON字典级别, 具体可参考库包中demo目录中的示例):",
+                        "  host - wiki网站, 可以设置多个网站的贡献生成参数, 这将与您已登陆的网站匹配",
+                        "    namespace_ranking - 命名空间排名参数, 即团队排名",
+                        "      ranking_ns - 参与排名的命名空间列表数组, 例如: [\"开发中心\", \"运维中心\"]",
+                        "      level_dict - 命名空间上下层级关系字典, key为上级命名空间名, value为下级命名空间列表数组",
+                        "      ns_dict - 命名空间名字和id对应字典, key为命名空间名, value为命名空间id(int类型)",
+                        "      description - 命名空间贡献排行说明",
+                        "    person_ranking - 个人排名参数",
+                        "      top - int类型，限定显示排名的前多少",
+                        "      add_score - float类型, 新增页面的统计贡献分数",
+                        "      change_score - float类型, 修改页面的统计贡献分数",
+                        "      black_list - 黑名单列表, 不纳入统计的用户名, 例如: [\"Admin\"]",
+                        "      ns_list - 参与统计的命名空间id清单, 例如: [\"0\", \"12\", \"3000\"]",
+                        "      description_total - 总贡献排行说明",
+                        "      description_last_month - 月贡献排行说明",
+                        "      description_last_week - 周贡献排行说明",
                         ""
                 ]
             }
